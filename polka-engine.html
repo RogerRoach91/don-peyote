@@ -9,38 +9,37 @@
         body {
             margin: 0;
             overflow: hidden;
-            background: #222;
+            background: #1a1a1a;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             touch-action: none;
         }
         canvas {
             display: block;
             image-rendering: pixelated;
-            background: #87CEEB; /* Sky Blue */
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            max-width: 100%;
-            height: auto;
+            background: #87CEEB;
+            box-shadow: 0 0 30px rgba(0,0,0,0.6);
+            margin: auto;
         }
         .ui-panel {
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.85);
             color: white;
             padding: 15px;
-            border-radius: 8px;
+            border-radius: 12px;
             pointer-events: auto;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.15);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        .touch-btn {
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid white;
-            border-radius: 50%;
-            display: flex;
+        #game-overlay {
+            display: none;
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            user-select: none;
-        }
-        .touch-btn:active {
-            background: rgba(255, 255, 255, 0.5);
+            color: white;
+            z-index: 100;
         }
     </style>
 </head>
@@ -49,33 +48,30 @@
     <div id="game-container" class="relative">
         <canvas id="gameCanvas"></canvas>
         
-        <!-- UI Overlay -->
-        <div class="absolute top-4 left-4 ui-panel flex flex-col gap-2">
-            <div class="text-xl font-bold">Retro Builder</div>
-            <div class="text-sm opacity-80">ARROWS to Move & Jump</div>
-            <div class="text-sm opacity-80">E to toggle Edit Mode</div>
-            <div id="mode-indicator" class="text-yellow-400 font-bold">PLAY MODE</div>
+        <div id="game-overlay">
+            <h1 id="overlay-title" class="text-6xl font-black mb-8 tracking-tighter italic">GAME OVER</h1>
+            <button onclick="resetGame()" class="px-10 py-4 bg-white text-black font-black rounded-full hover:bg-yellow-400 transition-all active:scale-90 uppercase tracking-widest shadow-lg">Try Again</button>
         </div>
 
-        <!-- Edit Palette (Hidden in Play Mode) -->
+        <!-- Left Controls Info -->
+        <div class="absolute top-4 left-4 ui-panel flex flex-col gap-1">
+            <div class="text-xl font-black italic uppercase text-yellow-400">Retro Engine</div>
+            <div class="text-xs font-bold opacity-80 uppercase tracking-wider">Arrows / WASD: Move</div>
+            <div class="text-xs font-bold opacity-80 uppercase tracking-wider">Space / W: Jump</div>
+            <div class="h-px bg-white/20 my-1"></div>
+            <div class="text-xs font-bold opacity-80 italic">Press 'E' for Level Editor</div>
+            <div id="mode-indicator" class="text-cyan-400 font-black text-sm mt-1 uppercase tracking-tighter">Play Mode</div>
+        </div>
+
+        <!-- Tile Palette -->
         <div id="palette" class="absolute top-4 right-4 ui-panel hidden">
-            <div class="text-xs mb-2">TILE PALETTE</div>
+            <div class="text-[10px] mb-2 font-black opacity-60 uppercase tracking-widest">Tile Palette</div>
             <div class="flex gap-2">
-                <button onclick="setTileType(1)" class="w-8 h-8 bg-orange-700 border-2 border-white" title="Brick"></button>
-                <button onclick="setTileType(2)" class="w-8 h-8 bg-green-600 border-2 border-transparent" title="Grass"></button>
-                <button onclick="setTileType(3)" class="w-8 h-8 bg-yellow-400 border-2 border-transparent" title="Coin Block"></button>
-                <button onclick="setTileType(0)" class="w-8 h-8 bg-sky-300 border-2 border-transparent" title="Eraser"></button>
-            </div>
-        </div>
-
-        <!-- Mobile Controls (Only visible on touch) -->
-        <div id="touch-controls" class="absolute bottom-8 left-0 right-0 flex justify-between px-8 pointer-events-none opacity-0 md:hidden">
-            <div class="flex gap-4 pointer-events-auto">
-                <div id="btn-left" class="touch-btn">⬅️</div>
-                <div id="btn-right" class="touch-btn">➡️</div>
-            </div>
-            <div class="pointer-events-auto">
-                <div id="btn-jump" class="touch-btn">JUMP</div>
+                <button onclick="setTileType(1)" class="w-10 h-10 bg-[#8B4513] border-4 border-white rounded-md transition-all" title="Brick"></button>
+                <button onclick="setTileType(2)" class="w-10 h-10 bg-[#228B22] border-4 border-transparent rounded-md transition-all" title="Grass"></button>
+                <button onclick="setTileType(3)" class="w-10 h-10 bg-[#FFD700] border-4 border-transparent rounded-md transition-all" title="Coin Block"></button>
+                <button onclick="setTileType(4)" class="w-10 h-10 bg-black border-4 border-transparent rounded-md transition-all" title="Goal Flag"></button>
+                <button onclick="setTileType(0)" class="w-12 h-10 bg-sky-300 border-2 border-transparent text-black text-[10px] font-black rounded-md flex items-center justify-center" title="Eraser">ERASE</button>
             </div>
         </div>
     </div>
@@ -85,75 +81,86 @@
         const ctx = canvas.getContext('2d');
         const modeIndicator = document.getElementById('mode-indicator');
         const palette = document.getElementById('palette');
+        const overlay = document.getElementById('game-overlay');
+        const overlayTitle = document.getElementById('overlay-title');
 
-        // Game Constants
+        // Physics Settings
         const TILE_SIZE = 40;
-        const GRAVITY = 0.6;
-        const FRICTION = 0.8;
-        const JUMP_FORCE = -12;
-        const SPEED = 0.8;
+        const GRAVITY = 0.7;
+        const FRICTION = 0.82;
+        const AIR_RES = 0.94;
+        const JUMP_FORCE = -14.5;
+        const ACCEL = 0.9;
         const MAX_SPEED = 6;
+        const COLLISION_MARGIN = 2; // The "Skin Width" fix
 
-        // Viewport
         canvas.width = 800;
         canvas.height = 480;
 
-        // Game State
         let isEditMode = false;
         let selectedTileType = 1;
         let cameraX = 0;
+        let gameActive = true;
+        const keys = {};
 
         const player = {
             x: 100,
-            y: 100,
-            width: 30,
-            height: 40,
+            y: 300,
+            width: 28,
+            height: 38,
             vx: 0,
             vy: 0,
             onGround: false,
-            coyoteTime: 0,
-            color: '#FF3B30'
+            coyoteTime: 0
         };
 
-        const keys = {};
+        let enemies = [];
         const world = [];
         const ROWS = canvas.height / TILE_SIZE;
-        const COLS = 100; // Large level width
+        const COLS = 150; 
 
-        // Initialize World (Simple flat ground)
         function initWorld() {
+            enemies = [];
             for (let r = 0; r < ROWS; r++) {
                 world[r] = [];
                 for (let c = 0; c < COLS; c++) {
-                    if (r === ROWS - 1) world[r][c] = 1; // Floor
-                    else if (r === ROWS - 4 && c % 10 === 0) world[r][c] = 3; // Floating blocks
+                    if (r === ROWS - 1) world[r][c] = 1; 
+                    else if (r === ROWS - 4 && c > 15 && c % 15 === 0) {
+                        world[r][c] = 3;
+                        spawnEnemy(c * TILE_SIZE, (r - 1) * TILE_SIZE);
+                    }
+                    else if (c === 140 && r === ROWS - 2) world[r][c] = 4;
                     else world[r][c] = 0;
                 }
             }
         }
 
-        // Input Handling
-        window.addEventListener('keydown', e => {
-            keys[e.code] = true;
+        function spawnEnemy(x, y) {
+            enemies.push({ x, y, width: 32, height: 32, vx: -2.5, dead: false });
+        }
+
+        // Input Setup
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => {
+            keys[e.code] = false;
             if (e.code === 'KeyE') toggleEditMode();
         });
-        window.addEventListener('keyup', e => keys[e.code] = false);
 
-        // Edit Mode Interaction
+        // Editor Logic
         canvas.addEventListener('mousedown', handleInteraction);
-        canvas.addEventListener('mousemove', (e) => {
-            if (e.buttons === 1) handleInteraction(e);
-        });
+        canvas.addEventListener('mousemove', (e) => { if (e.buttons === 1) handleInteraction(e); });
 
         function handleInteraction(e) {
             if (!isEditMode) return;
             const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) * (canvas.width / rect.width) + cameraX;
-            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX + cameraX;
+            const y = (e.clientY - rect.top) * scaleY;
             
             const col = Math.floor(x / TILE_SIZE);
             const row = Math.floor(y / TILE_SIZE);
-
+            
             if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
                 world[row][col] = selectedTileType;
             }
@@ -161,86 +168,126 @@
 
         function setTileType(type) {
             selectedTileType = type;
-            const buttons = document.querySelectorAll('#palette button');
-            buttons.forEach((btn, i) => {
-                btn.style.borderColor = (i === (3 - type + (type === 0 ? 0 : 0))) ? 'white' : 'transparent'; // Logic slightly off for simple toggle
-            });
-            // Update visual border feedback
-            Array.from(palette.querySelectorAll('button')).forEach(b => b.classList.remove('border-white'));
+            const buttons = Array.from(palette.querySelectorAll('button'));
+            buttons.forEach(btn => btn.style.borderColor = 'transparent');
+            if (event.target.tagName === 'BUTTON') event.target.style.borderColor = 'white';
         }
 
         function toggleEditMode() {
             isEditMode = !isEditMode;
-            modeIndicator.innerText = isEditMode ? 'EDIT MODE' : 'PLAY MODE';
-            modeIndicator.className = isEditMode ? 'text-red-400 font-bold' : 'text-yellow-400 font-bold';
+            modeIndicator.innerText = isEditMode ? 'Edit Mode' : 'Play Mode';
+            modeIndicator.className = isEditMode ? 'text-rose-400 font-black text-sm mt-1 uppercase tracking-tighter' : 'text-cyan-400 font-black text-sm mt-1 uppercase tracking-tighter';
             palette.classList.toggle('hidden', !isEditMode);
+            if (!isEditMode) gameActive = true;
         }
 
-        function getTile(r, c) {
-            if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return 0;
-            return world[r][c];
+        function resetGame() {
+            player.x = 100; player.y = 300;
+            player.vx = 0; player.vy = 0;
+            cameraX = 0;
+            gameActive = true;
+            overlay.style.display = 'none';
+            initWorld();
         }
 
         function update() {
-            if (isEditMode) return;
-
-            // Horizontal Movement
-            if (keys['ArrowLeft']) player.vx -= SPEED;
-            if (keys['ArrowRight']) player.vx += SPEED;
+            if (isEditMode) {
+                if (keys['ArrowLeft'] || keys['KeyA']) cameraX -= 15;
+                if (keys['ArrowRight'] || keys['KeyD']) cameraX += 15;
+                cameraX = Math.max(0, Math.min(cameraX, COLS * TILE_SIZE - canvas.width));
+                return;
+            }
             
-            player.vx *= FRICTION;
-            if (Math.abs(player.vx) < 0.1) player.vx = 0;
-            player.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.vx));
+            if (!gameActive) return;
 
-            // Vertical Movement
+            // Movement
+            const moveLeft = keys['ArrowLeft'] || keys['KeyA'];
+            const moveRight = keys['ArrowRight'] || keys['KeyD'];
+
+            if (moveLeft) player.vx -= ACCEL;
+            else if (moveRight) player.vx += ACCEL;
+            else player.vx *= (player.onGround ? FRICTION : AIR_RES);
+
+            player.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.vx));
+            if (Math.abs(player.vx) < 0.1) player.vx = 0;
+
             player.vy += GRAVITY;
 
-            // Collision Detection (Simple AABB)
-            // Move X
+            // X Collision
             player.x += player.vx;
-            checkCollision(true);
+            handleCollision(true);
 
-            // Move Y
+            // Y Collision
             player.y += player.vy;
             player.onGround = false;
-            checkCollision(false);
+            handleCollision(false);
 
-            // Coyote Time for better feel
-            if (player.onGround) player.coyoteTime = 10;
+            // Jump Timing
+            if (player.onGround) player.coyoteTime = 8;
             else player.coyoteTime--;
 
-            // Jumping
-            if (keys['ArrowUp'] || keys['Space']) {
-                if (player.coyoteTime > 0) {
-                    player.vy = JUMP_FORCE;
-                    player.coyoteTime = 0;
-                }
+            if ((keys['ArrowUp'] || keys['KeyW'] || keys['Space']) && player.coyoteTime > 0) {
+                player.vy = JUMP_FORCE;
+                player.coyoteTime = 0;
+                player.onGround = false;
             }
 
-            // Camera follow
+            // Enemy Logic
+            enemies.forEach(en => {
+                if (en.dead) return;
+                en.x += en.vx;
+                const edgeX = en.vx > 0 ? en.x + en.width : en.x;
+                const col = Math.floor(edgeX / TILE_SIZE);
+                const row = Math.floor((en.y + en.height / 2) / TILE_SIZE);
+                if (world[row] && world[row][col] > 0) en.vx *= -1;
+
+                // Hit Detection
+                if (player.x < en.x + en.width && player.x + player.width > en.x &&
+                    player.y < en.y + en.height && player.y + player.height > en.y) {
+                    
+                    if (player.vy > 0 && player.y + player.height < en.y + 15) {
+                        en.dead = true;
+                        player.vy = -10;
+                    } else {
+                        gameActive = false;
+                        overlay.style.display = 'flex';
+                        overlayTitle.innerText = "GAME OVER";
+                        overlayTitle.className = "text-6xl font-black mb-8 tracking-tighter italic text-red-500";
+                    }
+                }
+            });
+
+            // Camera
             let targetCam = player.x - canvas.width / 2;
             cameraX += (targetCam - cameraX) * 0.1;
             cameraX = Math.max(0, Math.min(cameraX, COLS * TILE_SIZE - canvas.width));
 
-            // Out of bounds
-            if (player.y > canvas.height + 100) {
-                player.x = 100;
-                player.y = 100;
-                player.vy = 0;
+            if (player.y > canvas.height) {
+                gameActive = false;
+                overlay.style.display = 'flex';
             }
         }
 
-        function checkCollision(isHorizontal) {
-            const left = Math.floor(player.x / TILE_SIZE);
-            const right = Math.floor((player.x + player.width) / TILE_SIZE);
-            const top = Math.floor(player.y / TILE_SIZE);
-            const bottom = Math.floor((player.y + player.height) / TILE_SIZE);
+        function handleCollision(isX) {
+            const x1 = Math.floor((isX ? player.x : player.x + COLLISION_MARGIN) / TILE_SIZE);
+            const x2 = Math.floor((isX ? player.x + player.width : player.x + player.width - COLLISION_MARGIN) / TILE_SIZE);
+            const y1 = Math.floor((isX ? player.y + COLLISION_MARGIN : player.y) / TILE_SIZE);
+            const y2 = Math.floor((isX ? player.y + player.height - COLLISION_MARGIN : player.y + player.height) / TILE_SIZE);
 
-            for (let r = top; r <= bottom; r++) {
-                for (let c = left; c <= right; c++) {
-                    const tile = getTile(r, c);
+            for (let r = y1; r <= y2; r++) {
+                for (let c = x1; c <= x2; c++) {
+                    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
+                    const tile = world[r][c];
                     if (tile > 0) {
-                        if (isHorizontal) {
+                        if (tile === 4) {
+                            gameActive = false;
+                            overlayTitle.innerText = "VICTORY!";
+                            overlayTitle.className = "text-6xl font-black mb-8 tracking-tighter italic text-green-400";
+                            overlay.style.display = 'flex';
+                            return;
+                        }
+
+                        if (isX) {
                             if (player.vx > 0) player.x = c * TILE_SIZE - player.width;
                             else if (player.vx < 0) player.x = (c + 1) * TILE_SIZE;
                             player.vx = 0;
@@ -248,10 +295,11 @@
                             if (player.vy > 0) {
                                 player.y = r * TILE_SIZE - player.height;
                                 player.onGround = true;
+                                player.vy = 0;
                             } else if (player.vy < 0) {
                                 player.y = (r + 1) * TILE_SIZE;
+                                player.vy = 0;
                             }
-                            player.vy = 0;
                         }
                     }
                 }
@@ -260,97 +308,69 @@
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
             ctx.save();
-            ctx.translate(-cameraX, 0);
+            ctx.translate(-Math.floor(cameraX), 0);
 
             // Draw Level
             const startCol = Math.floor(cameraX / TILE_SIZE);
-            const endCol = startCol + Math.floor(canvas.width / TILE_SIZE) + 2;
+            const endCol = startCol + Math.ceil(canvas.width / TILE_SIZE) + 1;
 
             for (let r = 0; r < ROWS; r++) {
                 for (let c = startCol; c < endCol; c++) {
-                    const tile = getTile(r, c);
+                    if (c >= COLS) break;
+                    const tile = world[r][c];
                     if (tile === 0) continue;
-
-                    const x = c * TILE_SIZE;
-                    const y = r * TILE_SIZE;
-
-                    if (tile === 1) ctx.fillStyle = '#8B4513'; // Brick
-                    if (tile === 2) ctx.fillStyle = '#228B22'; // Grass
-                    if (tile === 3) ctx.fillStyle = '#FFD700'; // Coin block
-
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
                     
-                    // Highlights/Detail
-                    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-                    ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+                    const tx = c * TILE_SIZE;
+                    const ty = r * TILE_SIZE;
+
+                    if (tile === 1) ctx.fillStyle = '#6D4C41';
+                    if (tile === 2) ctx.fillStyle = '#43A047';
+                    if (tile === 3) ctx.fillStyle = '#FFB300';
+                    if (tile === 4) ctx.fillStyle = '#37474F';
+
+                    ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
+                    
+                    if (tile === 4) { // Goal Flag Detail
+                        ctx.fillStyle = '#CFD8DC'; ctx.fillRect(tx + 18, ty, 4, TILE_SIZE);
+                        ctx.fillStyle = '#D32F2F'; ctx.fillRect(tx + 22, ty + 4, 15, 12);
+                    }
                 }
             }
 
-            // Draw Player
-            ctx.fillStyle = player.color;
-            ctx.fillRect(player.x, player.y, player.width, player.height);
-            
-            // Eyes
-            ctx.fillStyle = 'white';
-            const eyeDir = player.vx >= 0 ? 5 : -5;
-            ctx.fillRect(player.x + player.width/2 + eyeDir, player.y + 10, 5, 5);
+            // Draw Enemies
+            enemies.forEach(en => {
+                if (en.dead) return;
+                ctx.fillStyle = '#8E24AA';
+                ctx.fillRect(en.x, en.y, en.width, en.height);
+                ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(en.x, en.y, en.width, en.height);
+            });
 
+            // Draw Player
+            ctx.fillStyle = '#F44336';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(player.x, player.y, player.width, player.height);
+            
             ctx.restore();
 
-            // Mobile Hint
-            if (isEditMode) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.font = '16px sans-serif';
-                ctx.fillText("Click/Drag to build the world", 20, canvas.height - 20);
-            }
-
-            requestAnimationFrame(() => {
-                update();
-                draw();
-            });
+            update();
+            requestAnimationFrame(draw);
         }
 
-        // Handle Window Resize
         function resize() {
-            const container = document.getElementById('game-container');
             const ratio = canvas.width / canvas.height;
-            let w = window.innerWidth * 0.9;
-            let h = w / ratio;
-            
-            if (h > window.innerHeight * 0.7) {
-                h = window.innerHeight * 0.7;
-                w = h * ratio;
-            }
-            
-            canvas.style.width = w + 'px';
-            canvas.style.height = h + 'px';
+            let w = window.innerWidth * 0.95, h = w / ratio;
+            if (h > window.innerHeight * 0.85) { h = window.innerHeight * 0.85; w = h * ratio; }
+            canvas.style.width = Math.floor(w) + 'px';
+            canvas.style.height = Math.floor(h) + 'px';
         }
 
         window.addEventListener('resize', resize);
-        
-        // Touch events for mobile
-        const btnLeft = document.getElementById('btn-left');
-        const btnRight = document.getElementById('btn-right');
-        const btnJump = document.getElementById('btn-jump');
-
-        if ('ontouchstart' in window) {
-            document.getElementById('touch-controls').style.opacity = "1";
-            const setKey = (code, val) => keys[code] = val;
-            btnLeft.ontouchstart = () => setKey('ArrowLeft', true);
-            btnLeft.ontouchend = () => setKey('ArrowLeft', false);
-            btnRight.ontouchstart = () => setKey('ArrowRight', true);
-            btnRight.ontouchend = () => setKey('ArrowRight', false);
-            btnJump.ontouchstart = () => setKey('ArrowUp', true);
-            btnJump.ontouchend = () => setKey('ArrowUp', false);
-        }
-
-        window.onload = () => {
-            initWorld();
-            resize();
-            draw();
-        };
+        window.onload = () => { initWorld(); resize(); draw(); };
     </script>
 </body>
 </html>
