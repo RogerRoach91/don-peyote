@@ -53,23 +53,21 @@
             <button onclick="resetGame()" class="px-10 py-4 bg-white text-black font-black rounded-full hover:bg-yellow-400 transition-all active:scale-90 uppercase tracking-widest shadow-lg">Try Again</button>
         </div>
 
-        <!-- Left Controls Info -->
         <div class="absolute top-4 left-4 ui-panel flex flex-col gap-1">
-            <div class="text-xl font-black italic uppercase text-yellow-400">Retro Engine</div>
+            <div class="text-xl font-black italic uppercase text-yellow-400">Sprite Engine</div>
             <div class="text-xs font-bold opacity-80 uppercase tracking-wider">Arrows / WASD: Move</div>
             <div class="text-xs font-bold opacity-80 uppercase tracking-wider">Space / W: Jump</div>
             <div class="h-px bg-white/20 my-1"></div>
-            <div class="text-xs font-bold opacity-80 italic">Press 'E' for Level Editor</div>
+            <div class="text-xs font-bold opacity-80 italic text-cyan-300">Tip: Change Image URLs in code</div>
             <div id="mode-indicator" class="text-cyan-400 font-black text-sm mt-1 uppercase tracking-tighter">Play Mode</div>
         </div>
 
-        <!-- Tile Palette -->
         <div id="palette" class="absolute top-4 right-4 ui-panel hidden">
             <div class="text-[10px] mb-2 font-black opacity-60 uppercase tracking-widest">Tile Palette</div>
             <div class="flex gap-2">
-                <button onclick="setTileType(1)" class="w-10 h-10 bg-[#8B4513] border-4 border-white rounded-md transition-all" title="Brick"></button>
-                <button onclick="setTileType(2)" class="w-10 h-10 bg-[#228B22] border-4 border-transparent rounded-md transition-all" title="Grass"></button>
-                <button onclick="setTileType(3)" class="w-10 h-10 bg-[#FFD700] border-4 border-transparent rounded-md transition-all" title="Coin Block"></button>
+                <button onclick="setTileType(1)" class="w-10 h-10 bg-[#6D4C41] border-4 border-white rounded-md transition-all" title="Brick"></button>
+                <button onclick="setTileType(2)" class="w-10 h-10 bg-[#43A047] border-4 border-transparent rounded-md transition-all" title="Grass"></button>
+                <button onclick="setTileType(3)" class="w-10 h-10 bg-[#FFB300] border-4 border-transparent rounded-md transition-all" title="Coin Block"></button>
                 <button onclick="setTileType(4)" class="w-10 h-10 bg-black border-4 border-transparent rounded-md transition-all" title="Goal Flag"></button>
                 <button onclick="setTileType(0)" class="w-12 h-10 bg-sky-300 border-2 border-transparent text-black text-[10px] font-black rounded-md flex items-center justify-center" title="Eraser">ERASE</button>
             </div>
@@ -84,6 +82,30 @@
         const overlay = document.getElementById('game-overlay');
         const overlayTitle = document.getElementById('overlay-title');
 
+        // --- SPRITE CONFIGURATION ---
+        // Replace these URLs with your own hosted images!
+        const SPRITES = {
+            player: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/25.png', // Pikachu!
+            enemy: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/129.png',  // Magikarp!
+            brick: 'https://raw.githubusercontent.com/Aris-F/Pixel-Art-Assets/main/Tiles/Brick.png',
+            grass: 'https://raw.githubusercontent.com/Aris-F/Pixel-Art-Assets/main/Tiles/Grass.png',
+            coin: 'https://raw.githubusercontent.com/Aris-F/Pixel-Art-Assets/main/Items/Coin.png'
+        };
+
+        const images = {};
+        let imagesLoaded = 0;
+        const totalImages = Object.keys(SPRITES).length;
+
+        function loadImages() {
+            for (let key in SPRITES) {
+                const img = new Image();
+                img.src = SPRITES[key];
+                img.onload = () => { imagesLoaded++; };
+                img.onerror = () => { console.warn(`Failed to load sprite: ${key}`); };
+                images[key] = img;
+            }
+        }
+
         // Physics Settings
         const TILE_SIZE = 40;
         const GRAVITY = 0.7;
@@ -92,7 +114,7 @@
         const JUMP_FORCE = -14.5;
         const ACCEL = 0.9;
         const MAX_SPEED = 6;
-        const COLLISION_MARGIN = 2; // The "Skin Width" fix
+        const COLLISION_MARGIN = 4;
 
         canvas.width = 800;
         canvas.height = 480;
@@ -106,12 +128,13 @@
         const player = {
             x: 100,
             y: 300,
-            width: 28,
-            height: 38,
+            width: 32,
+            height: 32,
             vx: 0,
             vy: 0,
             onGround: false,
-            coyoteTime: 0
+            coyoteTime: 0,
+            facingRight: true
         };
 
         let enemies = [];
@@ -139,14 +162,12 @@
             enemies.push({ x, y, width: 32, height: 32, vx: -2.5, dead: false });
         }
 
-        // Input Setup
         window.addEventListener('keydown', e => keys[e.code] = true);
         window.addEventListener('keyup', e => {
             keys[e.code] = false;
             if (e.code === 'KeyE') toggleEditMode();
         });
 
-        // Editor Logic
         canvas.addEventListener('mousedown', handleInteraction);
         canvas.addEventListener('mousemove', (e) => { if (e.buttons === 1) handleInteraction(e); });
 
@@ -157,20 +178,16 @@
             const scaleY = canvas.height / rect.height;
             const x = (e.clientX - rect.left) * scaleX + cameraX;
             const y = (e.clientY - rect.top) * scaleY;
-            
             const col = Math.floor(x / TILE_SIZE);
             const row = Math.floor(y / TILE_SIZE);
-            
-            if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
-                world[row][col] = selectedTileType;
-            }
+            if (row >= 0 && row < ROWS && col >= 0 && col < COLS) world[row][col] = selectedTileType;
         }
 
         function setTileType(type) {
             selectedTileType = type;
             const buttons = Array.from(palette.querySelectorAll('button'));
             buttons.forEach(btn => btn.style.borderColor = 'transparent');
-            if (event.target.tagName === 'BUTTON') event.target.style.borderColor = 'white';
+            if (event && event.target && event.target.tagName === 'BUTTON') event.target.style.borderColor = 'white';
         }
 
         function toggleEditMode() {
@@ -197,32 +214,32 @@
                 cameraX = Math.max(0, Math.min(cameraX, COLS * TILE_SIZE - canvas.width));
                 return;
             }
-            
             if (!gameActive) return;
 
-            // Movement
             const moveLeft = keys['ArrowLeft'] || keys['KeyA'];
             const moveRight = keys['ArrowRight'] || keys['KeyD'];
 
-            if (moveLeft) player.vx -= ACCEL;
-            else if (moveRight) player.vx += ACCEL;
-            else player.vx *= (player.onGround ? FRICTION : AIR_RES);
+            if (moveLeft) {
+                player.vx -= ACCEL;
+                player.facingRight = false;
+            } else if (moveRight) {
+                player.vx += ACCEL;
+                player.facingRight = true;
+            } else {
+                player.vx *= (player.onGround ? FRICTION : AIR_RES);
+            }
 
             player.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.vx));
             if (Math.abs(player.vx) < 0.1) player.vx = 0;
 
             player.vy += GRAVITY;
 
-            // X Collision
             player.x += player.vx;
             handleCollision(true);
-
-            // Y Collision
             player.y += player.vy;
             player.onGround = false;
             handleCollision(false);
 
-            // Jump Timing
             if (player.onGround) player.coyoteTime = 8;
             else player.coyoteTime--;
 
@@ -232,7 +249,6 @@
                 player.onGround = false;
             }
 
-            // Enemy Logic
             enemies.forEach(en => {
                 if (en.dead) return;
                 en.x += en.vx;
@@ -241,10 +257,8 @@
                 const row = Math.floor((en.y + en.height / 2) / TILE_SIZE);
                 if (world[row] && world[row][col] > 0) en.vx *= -1;
 
-                // Hit Detection
                 if (player.x < en.x + en.width && player.x + player.width > en.x &&
                     player.y < en.y + en.height && player.y + player.height > en.y) {
-                    
                     if (player.vy > 0 && player.y + player.height < en.y + 15) {
                         en.dead = true;
                         player.vy = -10;
@@ -252,12 +266,10 @@
                         gameActive = false;
                         overlay.style.display = 'flex';
                         overlayTitle.innerText = "GAME OVER";
-                        overlayTitle.className = "text-6xl font-black mb-8 tracking-tighter italic text-red-500";
                     }
                 }
             });
 
-            // Camera
             let targetCam = player.x - canvas.width / 2;
             cameraX += (targetCam - cameraX) * 0.1;
             cameraX = Math.max(0, Math.min(cameraX, COLS * TILE_SIZE - canvas.width));
@@ -286,7 +298,6 @@
                             overlay.style.display = 'flex';
                             return;
                         }
-
                         if (isX) {
                             if (player.vx > 0) player.x = c * TILE_SIZE - player.width;
                             else if (player.vx < 0) player.x = (c + 1) * TILE_SIZE;
@@ -306,12 +317,29 @@
             }
         }
 
+        function drawSprite(img, x, y, w, h, flip = false) {
+            if (img && img.complete && img.naturalWidth !== 0) {
+                if (flip) {
+                    ctx.save();
+                    ctx.translate(x + w, y);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(img, 0, 0, w, h);
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(img, x, y, w, h);
+                }
+            } else {
+                // Fallback to colors if image fails
+                ctx.fillStyle = ctx.fillStyle || 'red';
+                ctx.fillRect(x, y, w, h);
+            }
+        }
+
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
             ctx.translate(-Math.floor(cameraX), 0);
 
-            // Draw Level
             const startCol = Math.floor(cameraX / TILE_SIZE);
             const endCol = startCol + Math.ceil(canvas.width / TILE_SIZE) + 1;
 
@@ -324,39 +352,26 @@
                     const tx = c * TILE_SIZE;
                     const ty = r * TILE_SIZE;
 
-                    if (tile === 1) ctx.fillStyle = '#6D4C41';
-                    if (tile === 2) ctx.fillStyle = '#43A047';
-                    if (tile === 3) ctx.fillStyle = '#FFB300';
-                    if (tile === 4) ctx.fillStyle = '#37474F';
-
-                    ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
-                    
-                    if (tile === 4) { // Goal Flag Detail
-                        ctx.fillStyle = '#CFD8DC'; ctx.fillRect(tx + 18, ty, 4, TILE_SIZE);
-                        ctx.fillStyle = '#D32F2F'; ctx.fillRect(tx + 22, ty + 4, 15, 12);
+                    if (tile === 1) drawSprite(images.brick, tx, ty, TILE_SIZE, TILE_SIZE);
+                    else if (tile === 2) drawSprite(images.grass, tx, ty, TILE_SIZE, TILE_SIZE);
+                    else if (tile === 3) drawSprite(images.coin, tx, ty, TILE_SIZE, TILE_SIZE);
+                    else if (tile === 4) {
+                        ctx.fillStyle = '#37474F';
+                        ctx.fillRect(tx + 18, ty, 4, TILE_SIZE);
+                        ctx.fillStyle = '#D32F2F';
+                        ctx.fillRect(tx + 22, ty + 4, 15, 12);
                     }
                 }
             }
 
-            // Draw Enemies
             enemies.forEach(en => {
                 if (en.dead) return;
-                ctx.fillStyle = '#8E24AA';
-                ctx.fillRect(en.x, en.y, en.width, en.height);
-                ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(en.x, en.y, en.width, en.height);
+                drawSprite(images.enemy, en.x, en.y, en.width, en.height, en.vx > 0);
             });
 
-            // Draw Player
-            ctx.fillStyle = '#F44336';
-            ctx.fillRect(player.x, player.y, player.width, player.height);
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(player.x, player.y, player.width, player.height);
+            drawSprite(images.player, player.x, player.y, player.width, player.height, !player.facingRight);
             
             ctx.restore();
-
             update();
             requestAnimationFrame(draw);
         }
@@ -370,7 +385,7 @@
         }
 
         window.addEventListener('resize', resize);
-        window.onload = () => { initWorld(); resize(); draw(); };
+        window.onload = () => { loadImages(); initWorld(); resize(); draw(); };
     </script>
 </body>
 </html>
