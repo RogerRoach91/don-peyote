@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Retro Platformer Creator</title>
+    <title>Retro Platformer Creator - BOSS BATTLE</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -41,6 +41,28 @@
             color: white;
             z-index: 100;
         }
+        #boss-ui {
+            display: none;
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            text-align: center;
+        }
+        .hp-bar {
+            height: 12px;
+            background: #441111;
+            border: 2px solid white;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        #hp-fill {
+            height: 100%;
+            background: #ff0000;
+            width: 100%;
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center h-screen">
@@ -48,9 +70,14 @@
     <div id="game-container" class="relative">
         <canvas id="gameCanvas"></canvas>
         
+        <div id="boss-ui">
+            <div class="text-white font-black uppercase text-xs mb-1 tracking-widest">Gyarados Boss</div>
+            <div class="hp-bar"><div id="hp-fill"></div></div>
+        </div>
+
         <div id="game-overlay">
-            <h1 id="overlay-title" class="text-6xl font-black mb-8 tracking-tighter italic">GAME OVER</h1>
-            <div id="overlay-sub" class="text-xl mb-8 opacity-80 font-bold uppercase tracking-widest"></div>
+            <h1 id="overlay-title" class="text-6xl font-black mb-8 tracking-tighter italic text-center">GAME OVER</h1>
+            <div id="overlay-sub" class="text-xl mb-8 opacity-80 font-bold uppercase tracking-widest text-center"></div>
             <button id="overlay-btn" onclick="resetGame()" class="px-10 py-4 bg-white text-black font-black rounded-full hover:bg-yellow-400 transition-all active:scale-90 uppercase tracking-widest shadow-lg">Try Again</button>
         </div>
 
@@ -60,7 +87,6 @@
             <div class="h-px bg-white/20 my-1"></div>
             <div class="text-[10px] font-bold opacity-60 uppercase tracking-wider">Arrows / WASD: Move</div>
             <div class="text-[10px] font-bold opacity-60 uppercase tracking-wider">Space / W: Jump</div>
-            <div class="text-[10px] font-bold opacity-60 italic text-cyan-300 mt-1">Press 'E' for Level Editor</div>
             <div id="mode-indicator" class="text-cyan-400 font-black text-sm mt-1 uppercase tracking-tighter">Play Mode</div>
             <button onclick="toggleMusic()" id="music-btn" class="mt-2 text-[10px] bg-white/10 hover:bg-white/20 px-2 py-1 rounded border border-white/20 uppercase font-bold tracking-widest">Toggle Music: OFF</button>
         </div>
@@ -68,11 +94,11 @@
         <div id="palette" class="absolute top-4 right-4 ui-panel hidden">
             <div class="text-[10px] mb-2 font-black opacity-60 uppercase tracking-widest">Tile Palette</div>
             <div class="flex gap-2">
-                <button onclick="setTileType(1)" class="w-10 h-10 bg-[#6D4C41] border-4 border-white rounded-md transition-all" title="Brick"></button>
-                <button onclick="setTileType(2)" class="w-10 h-10 bg-[#43A047] border-4 border-transparent rounded-md transition-all" title="Grass"></button>
-                <button onclick="setTileType(3)" class="w-10 h-10 bg-[#FFB300] border-4 border-transparent rounded-md transition-all" title="Coin Block"></button>
-                <button onclick="setTileType(4)" class="w-10 h-10 bg-black border-4 border-transparent rounded-md transition-all" title="Goal Flag"></button>
-                <button onclick="setTileType(0)" class="w-12 h-10 bg-sky-300 border-2 border-transparent text-black text-[10px] font-black rounded-md flex items-center justify-center" title="Eraser">ERASE</button>
+                <button onclick="setTileType(1)" class="w-10 h-10 bg-[#6D4C41] border-4 border-white rounded-md transition-all"></button>
+                <button onclick="setTileType(2)" class="w-10 h-10 bg-[#43A047] border-4 border-transparent rounded-md transition-all"></button>
+                <button onclick="setTileType(3)" class="w-10 h-10 bg-[#FFB300] border-4 border-transparent rounded-md transition-all"></button>
+                <button onclick="setTileType(4)" class="w-10 h-10 bg-black border-4 border-transparent rounded-md transition-all"></button>
+                <button onclick="setTileType(0)" class="w-12 h-10 bg-sky-300 border-2 border-transparent text-black text-[10px] font-black rounded-md flex items-center justify-center">ERASE</button>
             </div>
         </div>
     </div>
@@ -88,11 +114,14 @@
         const overlaySub = document.getElementById('overlay-sub');
         const overlayBtn = document.getElementById('overlay-btn');
         const musicBtn = document.getElementById('music-btn');
+        const bossUI = document.getElementById('boss-ui');
+        const hpFill = document.getElementById('hp-fill');
 
         // --- AUDIO ENGINE ---
         let audioCtx = null;
         let isMusicPlaying = false;
         let musicTimer = null;
+        let step = 0;
 
         function initAudio() {
             if (audioCtx) return;
@@ -100,6 +129,7 @@
         }
 
         function playNote(freq, startTime, duration, type = 'square', vol = 0.1) {
+            if (!audioCtx) return;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = type;
@@ -112,21 +142,18 @@
             osc.stop(startTime + duration);
         }
 
-        const melody = [
-            261.63, 293.66, 329.63, 349.23, 392.00, 329.63, 261.63, 293.66,
-            392.00, 349.23, 329.63, 261.63, 293.66, 261.63, 196.00, 261.63
-        ];
-        let step = 0;
+        const melody = [261.63, 293.66, 329.63, 349.23, 392.00, 329.63, 261.63, 293.66, 392.00, 349.23, 329.63, 261.63, 293.66, 261.63, 196.00, 261.63];
+        const bossMelody = [130.81, 138.59, 130.81, 123.47, 130.81, 138.59, 146.83, 155.56];
 
         function musicLoop() {
             if (!isMusicPlaying) return;
             const now = audioCtx.currentTime;
-            const tempo = 0.15;
+            const isBoss = (LEVELS[currentLevelIndex] && LEVELS[currentLevelIndex].isBoss);
+            const currentMelody = isBoss ? bossMelody : melody;
+            const tempo = isBoss ? 0.12 : 0.15;
             
-            // Bass line
-            if (step % 2 === 0) playNote(melody[step % 4] / 2, now, 0.4, 'triangle', 0.15);
-            // Melody
-            playNote(melody[step % melody.length], now, 0.2, 'square', 0.05);
+            if (step % 2 === 0) playNote(currentMelody[step % 4] / 2, now, 0.4, 'triangle', 0.15);
+            playNote(currentMelody[step % currentMelody.length], now, 0.2, isBoss ? 'sawtooth' : 'square', 0.05);
             
             step++;
             musicTimer = setTimeout(musicLoop, tempo * 1000);
@@ -135,7 +162,6 @@
         function toggleMusic() {
             initAudio();
             if (audioCtx.state === 'suspended') audioCtx.resume();
-            
             isMusicPlaying = !isMusicPlaying;
             if (isMusicPlaying) {
                 musicBtn.innerText = "Toggle Music: ON";
@@ -146,28 +172,27 @@
             }
         }
 
-        // --- SPRITE CONFIGURATION ---
+        // --- SPRITES ---
         const SPRITES = {
             player: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/25.png', 
-            enemy: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/129.png',  
+            enemy: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/129.png',
+            boss: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/130.png',
             brick: 'https://raw.githubusercontent.com/Aris-F/Pixel-Art-Assets/main/Tiles/Brick.png',
             grass: 'https://raw.githubusercontent.com/Aris-F/Pixel-Art-Assets/main/Tiles/Grass.png',
             coin: 'https://raw.githubusercontent.com/Aris-F/Pixel-Art-Assets/main/Items/Coin.png'
         };
 
         const images = {};
-        let imagesLoaded = 0;
-
         function loadImages() {
             for (let key in SPRITES) {
                 const img = new Image();
+                img.crossOrigin = "anonymous";
                 img.src = SPRITES[key];
-                img.onload = () => { imagesLoaded++; };
                 images[key] = img;
             }
         }
 
-        // Physics Settings
+        // Physics
         const TILE_SIZE = 40;
         const GRAVITY = 0.7;
         const FRICTION = 0.82;
@@ -193,6 +218,7 @@
         };
 
         let enemies = [];
+        let boss = null;
         const world = [];
         const ROWS = canvas.height / TILE_SIZE;
         const COLS = 150; 
@@ -203,13 +229,13 @@
                 bgColor: "#87CEEB",
                 setup: (w) => {
                     for(let c=0; c<COLS; c++) {
-                        w[ROWS-1][c] = 2; // Floor
+                        w[ROWS-1][c] = 2;
                         if (c > 20 && c % 15 === 0) {
                             w[ROWS-4][c] = 3;
                             spawnEnemy(c * TILE_SIZE, (ROWS - 2) * TILE_SIZE);
                         }
                     }
-                    w[ROWS-2][140] = 4; // Goal
+                    w[ROWS-2][140] = 4;
                 }
             },
             {
@@ -219,8 +245,7 @@
                     for(let c=0; c<COLS; c++) {
                         if (c % 8 < 4) w[ROWS-1][c] = 1;
                         if (c % 12 === 0 && c > 10) {
-                            w[ROWS-4][c] = 1;
-                            w[ROWS-4][c+1] = 1;
+                            w[ROWS-4][c] = 1; w[ROWS-4][c+1] = 1;
                             spawnEnemy((c+1) * TILE_SIZE, (ROWS - 5) * TILE_SIZE);
                         }
                         if (c % 15 === 5) w[ROWS-6][c] = 3;
@@ -229,31 +254,47 @@
                 }
             },
             {
-                name: "Level 3: The Great Corridor",
+                name: "Level 3: The Fortress",
                 bgColor: "#2C3E50",
                 setup: (w) => {
                     for(let c=0; c<COLS; c++) {
-                        w[ROWS-1][c] = 1;
-                        w[0][c] = 1;
+                        w[ROWS-1][c] = 1; w[0][c] = 1;
                         if (c % 10 === 0 && c > 5) {
-                            for(let r=1; r<ROWS-4; r++) w[r][c] = 1;
+                            for(let r=1; r<ROWS-5; r++) w[r][c] = 1;
                             spawnEnemy(c * TILE_SIZE + 80, (ROWS - 2) * TILE_SIZE);
                         }
                     }
                     w[ROWS-2][140] = 4;
+                }
+            },
+            {
+                name: "FINAL BOSS: THE ABYSS",
+                bgColor: "#1a1a1a",
+                isBoss: true,
+                setup: (w) => {
+                    for(let c=0; c<30; c++) w[ROWS-1][c] = 1; // Arena
+                    boss = { 
+                        x: 600, y: 100, width: 120, height: 120, 
+                        vx: -2, vy: 0, hp: 5, maxHp: 5, invuln: 0 
+                    };
                 }
             }
         ];
 
         function initWorld() {
             enemies = [];
+            boss = null;
+            bossUI.style.display = 'none';
             for (let r = 0; r < ROWS; r++) {
                 world[r] = [];
                 for (let c = 0; c < COLS; c++) world[r][c] = 0;
             }
-            LEVELS[currentLevelIndex].setup(world);
-            canvas.style.background = LEVELS[currentLevelIndex].bgColor;
-            levelDisplay.innerText = LEVELS[currentLevelIndex].name;
+            if (LEVELS[currentLevelIndex]) {
+                LEVELS[currentLevelIndex].setup(world);
+                canvas.style.background = LEVELS[currentLevelIndex].bgColor;
+                levelDisplay.innerText = LEVELS[currentLevelIndex].name;
+                if (LEVELS[currentLevelIndex].isBoss) bossUI.style.display = 'block';
+            }
         }
 
         function spawnEnemy(x, y) {
@@ -262,54 +303,22 @@
 
         function nextLevel() {
             currentLevelIndex++;
-            if (currentLevelIndex >= LEVELS.length) {
-                gameActive = false;
-                overlayTitle.innerText = "GRAND VICTORY!";
-                overlayTitle.className = "text-6xl font-black mb-4 tracking-tighter italic text-yellow-400";
-                overlaySub.innerText = "You've conquered all levels!";
-                overlayBtn.innerText = "Replay All";
-                overlay.style.display = 'flex';
-                currentLevelIndex = 0;
-            } else {
-                resetGame();
-            }
+            if (currentLevelIndex >= LEVELS.length) victory();
+            else resetGame();
+        }
+
+        function victory() {
+            gameActive = false;
+            overlay.style.display = 'flex';
+            overlayTitle.innerText = "GRAND VICTORY!";
+            overlayTitle.className = "text-6xl font-black mb-4 tracking-tighter italic text-yellow-400";
+            overlaySub.innerText = "You defeated the Boss and saved the Pixel World!";
+            overlayBtn.innerText = "Replay All";
+            currentLevelIndex = 0;
         }
 
         window.addEventListener('keydown', e => keys[e.code] = true);
-        window.addEventListener('keyup', e => {
-            keys[e.code] = false;
-            if (e.code === 'KeyE') toggleEditMode();
-        });
-
-        canvas.addEventListener('mousedown', handleInteraction);
-        canvas.addEventListener('mousemove', (e) => { if (e.buttons === 1) handleInteraction(e); });
-
-        function handleInteraction(e) {
-            if (!isEditMode) return;
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const x = (e.clientX - rect.left) * scaleX + cameraX;
-            const y = (e.clientY - rect.top) * scaleY;
-            const col = Math.floor(x / TILE_SIZE);
-            const row = Math.floor(y / TILE_SIZE);
-            if (row >= 0 && row < ROWS && col >= 0 && col < COLS) world[row][col] = selectedTileType;
-        }
-
-        function setTileType(type) {
-            selectedTileType = type;
-            const buttons = Array.from(palette.querySelectorAll('button'));
-            buttons.forEach(btn => btn.style.borderColor = 'transparent');
-            if (event && event.target && event.target.tagName === 'BUTTON') event.target.style.borderColor = 'white';
-        }
-
-        function toggleEditMode() {
-            isEditMode = !isEditMode;
-            modeIndicator.innerText = isEditMode ? 'Edit Mode' : 'Play Mode';
-            modeIndicator.className = isEditMode ? 'text-rose-400 font-black text-sm mt-1 uppercase tracking-tighter' : 'text-cyan-400 font-black text-sm mt-1 uppercase tracking-tighter';
-            palette.classList.toggle('hidden', !isEditMode);
-            if (!isEditMode) gameActive = true;
-        }
+        window.addEventListener('keyup', e => keys[e.code] = false);
 
         function resetGame() {
             player.x = 100; player.y = 300;
@@ -317,20 +326,13 @@
             cameraX = 0;
             gameActive = true;
             overlay.style.display = 'none';
-            overlaySub.innerText = "";
-            overlayBtn.innerText = "Try Again";
             initWorld();
         }
 
         function update() {
-            if (isEditMode) {
-                if (keys['ArrowLeft'] || keys['KeyA']) cameraX -= 15;
-                if (keys['ArrowRight'] || keys['KeyD']) cameraX += 15;
-                cameraX = Math.max(0, Math.min(cameraX, COLS * TILE_SIZE - canvas.width));
-                return;
-            }
             if (!gameActive) return;
 
+            // Player movement
             const moveLeft = keys['ArrowLeft'] || keys['KeyA'];
             const moveRight = keys['ArrowRight'] || keys['KeyD'];
 
@@ -356,37 +358,65 @@
                 player.onGround = false;
             }
 
+            // Enemy & Boss logic
             enemies.forEach(en => {
                 if (en.dead) return;
                 en.x += en.vx;
-                const edgeX = en.vx > 0 ? en.x + en.width : en.x;
-                const col = Math.floor(edgeX / TILE_SIZE);
+                const col = Math.floor((en.vx > 0 ? en.x + en.width : en.x) / TILE_SIZE);
                 const row = Math.floor((en.y + en.height / 2) / TILE_SIZE);
                 if (world[row] && world[row][col] > 0) en.vx *= -1;
 
-                if (player.x < en.x + en.width && player.x + player.width > en.x &&
-                    player.y < en.y + en.height && player.y + player.height > en.y) {
+                if (checkOverlap(player, en)) {
                     if (player.vy > 0 && player.y + player.height < en.y + 15) {
-                        en.dead = true;
-                        player.vy = -10;
-                    } else {
-                        gameActive = false;
-                        overlay.style.display = 'flex';
-                        overlayTitle.innerText = "GAME OVER";
-                        overlayTitle.className = "text-6xl font-black mb-8 tracking-tighter italic text-red-500";
-                    }
+                        en.dead = true; player.vy = -10;
+                    } else gameOver();
                 }
             });
 
+            if (boss) {
+                if (boss.invuln > 0) boss.invuln--;
+                boss.x += boss.vx;
+                boss.vy += 0.2;
+                boss.y += boss.vy;
+
+                // Simple Boss AI
+                if (boss.x > player.x + 50) boss.vx = -2.5;
+                else if (boss.x < player.x - 50) boss.vx = 2.5;
+
+                // Boss floor collision
+                if (boss.y + boss.height > (ROWS - 1) * TILE_SIZE) {
+                    boss.y = (ROWS - 1) * TILE_SIZE - boss.height;
+                    boss.vy = -Math.random() * 5; 
+                }
+
+                if (checkOverlap(player, boss)) {
+                    if (player.vy > 0 && player.y + player.height < boss.y + 30 && boss.invuln === 0) {
+                        boss.hp--;
+                        boss.invuln = 60;
+                        player.vy = -12;
+                        hpFill.style.width = (boss.hp / boss.maxHp * 100) + '%';
+                        if (boss.hp <= 0) victory();
+                    } else if (boss.invuln === 0) gameOver();
+                }
+            }
+
+            // Camera
             let targetCam = player.x - canvas.width / 2;
             cameraX += (targetCam - cameraX) * 0.1;
             cameraX = Math.max(0, Math.min(cameraX, COLS * TILE_SIZE - canvas.width));
 
-            if (player.y > canvas.height) {
-                gameActive = false;
-                overlay.style.display = 'flex';
-                overlayTitle.innerText = "GAME OVER";
-            }
+            if (player.y > canvas.height) gameOver();
+        }
+
+        function checkOverlap(a, b) {
+            return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+        }
+
+        function gameOver() {
+            gameActive = false;
+            overlay.style.display = 'flex';
+            overlayTitle.innerText = "GAME OVER";
+            overlayTitle.className = "text-6xl font-black mb-8 tracking-tighter italic text-red-500";
         }
 
         function handleCollision(isX) {
@@ -398,12 +428,8 @@
             for (let r = y1; r <= y2; r++) {
                 for (let c = x1; c <= x2; c++) {
                     if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
-                    const tile = world[r][c];
-                    if (tile > 0) {
-                        if (tile === 4) {
-                            nextLevel();
-                            return;
-                        }
+                    if (world[r][c] > 0) {
+                        if (world[r][c] === 4) { nextLevel(); return; }
                         if (isX) {
                             if (player.vx > 0) player.x = c * TILE_SIZE - player.width;
                             else if (player.vx < 0) player.x = (c + 1) * TILE_SIZE;
@@ -411,11 +437,9 @@
                         } else {
                             if (player.vy > 0) {
                                 player.y = r * TILE_SIZE - player.height;
-                                player.onGround = true;
-                                player.vy = 0;
+                                player.onGround = true; player.vy = 0;
                             } else if (player.vy < 0) {
-                                player.y = (r + 1) * TILE_SIZE;
-                                player.vy = 0;
+                                player.y = (r + 1) * TILE_SIZE; player.vy = 0;
                             }
                         }
                     }
@@ -423,14 +447,14 @@
             }
         }
 
-        function drawSprite(img, x, y, w, h, flip = false) {
+        function safeDrawImage(img, ...args) {
             if (img && img.complete && img.naturalWidth !== 0) {
-                if (flip) {
-                    ctx.save(); ctx.translate(x + w, y); ctx.scale(-1, 1);
-                    ctx.drawImage(img, 0, 0, w, h); ctx.restore();
-                } else ctx.drawImage(img, x, y, w, h);
+                ctx.drawImage(img, ...args);
             } else {
-                ctx.fillStyle = 'red'; ctx.fillRect(x, y, w, h);
+                // Fallback: draw a colored rectangle if the image isn't ready or failed
+                const [x, y, w, h] = args.length === 4 ? args : [args[0], args[1], TILE_SIZE, TILE_SIZE];
+                ctx.fillStyle = '#ff00ff'; // Magenta for missing assets
+                ctx.fillRect(x, y, w || TILE_SIZE, h || TILE_SIZE);
             }
         }
 
@@ -439,32 +463,36 @@
             ctx.save();
             ctx.translate(-Math.floor(cameraX), 0);
 
-            const startCol = Math.floor(cameraX / TILE_SIZE);
-            const endCol = startCol + Math.ceil(canvas.width / TILE_SIZE) + 1;
-
+            // Tiles
             for (let r = 0; r < ROWS; r++) {
-                for (let c = startCol; c < endCol; c++) {
+                for (let c = Math.floor(cameraX/TILE_SIZE); c < Math.floor((cameraX+canvas.width)/TILE_SIZE)+1; c++) {
                     if (c >= COLS) break;
                     const tile = world[r][c];
-                    if (tile === 0) continue;
-                    const tx = c * TILE_SIZE;
-                    const ty = r * TILE_SIZE;
-
-                    if (tile === 1) drawSprite(images.brick, tx, ty, TILE_SIZE, TILE_SIZE);
-                    else if (tile === 2) drawSprite(images.grass, tx, ty, TILE_SIZE, TILE_SIZE);
-                    else if (tile === 3) drawSprite(images.coin, tx, ty, TILE_SIZE, TILE_SIZE);
+                    if (tile === 1) safeDrawImage(images.brick, c*TILE_SIZE, r*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    else if (tile === 2) safeDrawImage(images.grass, c*TILE_SIZE, r*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    else if (tile === 3) safeDrawImage(images.coin, c*TILE_SIZE, r*TILE_SIZE, TILE_SIZE, TILE_SIZE);
                     else if (tile === 4) {
-                        ctx.fillStyle = '#37474F'; ctx.fillRect(tx + 18, ty, 4, TILE_SIZE);
-                        ctx.fillStyle = '#D32F2F'; ctx.fillRect(tx + 22, ty + 4, 15, 12);
+                        ctx.fillStyle = '#37474F'; ctx.fillRect(c*TILE_SIZE + 18, r*TILE_SIZE, 4, TILE_SIZE);
+                        ctx.fillStyle = '#D32F2F'; ctx.fillRect(c*TILE_SIZE + 22, r*TILE_SIZE + 4, 15, 12);
                     }
                 }
             }
 
-            enemies.forEach(en => {
-                if (!en.dead) drawSprite(images.enemy, en.x, en.y, en.width, en.height, en.vx > 0);
-            });
+            enemies.forEach(en => { if (!en.dead) safeDrawImage(images.enemy, en.x, en.y, en.width, en.height); });
 
-            drawSprite(images.player, player.x, player.y, player.width, player.height, !player.facingRight);
+            if (boss) {
+                if (boss.invuln % 10 < 5) {
+                    safeDrawImage(images.boss, boss.x, boss.y, boss.width, boss.height);
+                }
+            }
+
+            // Player with flip
+            if (!player.facingRight) {
+                ctx.save(); ctx.translate(player.x + player.width, player.y); ctx.scale(-1, 1);
+                safeDrawImage(images.player, 0, 0, player.width, player.height); ctx.restore();
+            } else {
+                safeDrawImage(images.player, player.x, player.y, player.width, player.height);
+            }
             
             ctx.restore();
             update();
@@ -475,8 +503,7 @@
             const ratio = canvas.width / canvas.height;
             let w = window.innerWidth * 0.95, h = w / ratio;
             if (h > window.innerHeight * 0.85) { h = window.innerHeight * 0.85; w = h * ratio; }
-            canvas.style.width = Math.floor(w) + 'px';
-            canvas.style.height = Math.floor(h) + 'px';
+            canvas.style.width = Math.floor(w) + 'px'; canvas.style.height = Math.floor(h) + 'px';
         }
 
         window.addEventListener('resize', resize);
