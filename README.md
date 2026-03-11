@@ -5,6 +5,8 @@ a game i am building using generative ai
 
 [Live Game](https://gemini.google.com/share/f2dfa0bb1b05)
 
+[Conversation](https://gemini.google.com/share/98e9a6ebcfa4)
+
 [Design Document](https://docs.google.com/document/d/18NprFMqe9pgHnF8SVS0_Qj5dxadrME16i7pf5G5oqKA/edit?usp=sharing)
 
 
