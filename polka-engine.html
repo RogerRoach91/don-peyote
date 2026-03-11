@@ -134,13 +134,40 @@
         
         const textureLoader = new THREE.TextureLoader();
         
-        // Reliable sprite URLs
+        // Helper to create a solid color texture as a fallback
+        function createSolidTexture(color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 16;
+            canvas.height = 16;
+            const context = canvas.getContext('2d');
+            context.fillStyle = color;
+            context.fillRect(0, 0, 16, 16);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.NearestFilter;
+            return texture;
+        }
+
+        // Safe texture loader with fallback
+        function loadSafeTexture(url, fallbackColor, onComplete) {
+            return textureLoader.load(
+                url, 
+                (tex) => {
+                    tex.magFilter = THREE.NearestFilter;
+                    if (onComplete) onComplete(tex);
+                },
+                undefined,
+                (err) => {
+                    console.warn(`Failed to load ${url}, using fallback color ${fallbackColor}`);
+                    const tex = createSolidTexture(fallbackColor);
+                    if (onComplete) onComplete(tex);
+                }
+            );
+        }
+
         const SPRITES = {
             player: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/25.png',
             enemy: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/129.png',
-            // Using a reliable tileable grass asset from a common library
             grass: 'https://raw.githubusercontent.com/mizuno-takaaki/tileset-pro/master/Sample/MapChip/nature.png', 
-            // Using a brick-like pattern from a reliable public repo
             brick: 'https://raw.githubusercontent.com/photonstorm/phaser-examples/master/examples/assets/sprites/asplode.png', 
             bullet: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/items/poke-ball.png'
         };
@@ -155,7 +182,7 @@
             scene.background = new THREE.Color(0x87CEEB);
 
             const aspect = window.innerWidth / window.innerHeight;
-            const viewSize = 8; // Zoomed in a bit more for 2D feel
+            const viewSize = 8;
             camera = new THREE.OrthographicCamera(
                 -viewSize * aspect, viewSize * aspect,
                 viewSize, -viewSize,
@@ -185,8 +212,7 @@
         }
 
         function createPlayer() {
-            const texture = textureLoader.load(SPRITES.player);
-            texture.magFilter = THREE.NearestFilter;
+            const texture = loadSafeTexture(SPRITES.player, '#ffff00');
             const material = new THREE.SpriteMaterial({ map: texture });
             player = new THREE.Sprite(material);
             player.scale.set(1.5, 1.5, 1);
@@ -196,9 +222,8 @@
         }
 
         function createLevel() {
-            // Main Floor - Using Sprites tiled horizontally
-            const grassTex = textureLoader.load(SPRITES.grass);
-            grassTex.magFilter = THREE.NearestFilter;
+            // Main Floor
+            const grassTex = loadSafeTexture(SPRITES.grass, '#2d5a27');
             const grassMat = new THREE.SpriteMaterial({ map: grassTex });
 
             const floorY = 0;
@@ -208,7 +233,7 @@
                 tile.scale.set(tileSize, tileSize, 1);
                 tile.position.set(x * tileSize, floorY, 1);
                 scene.add(tile);
-                // Keep track of collision bounds for the floor
+                
                 if (x === -worldWidth/4) {
                     platforms.push({
                         pos: { x: 0, y: floorY },
@@ -218,9 +243,8 @@
                 }
             }
 
-            // Floating Platforms - Sprites
-            const brickTex = textureLoader.load(SPRITES.brick);
-            brickTex.magFilter = THREE.NearestFilter;
+            // Floating Platforms
+            const brickTex = loadSafeTexture(SPRITES.brick, '#8b4513');
             const brickMat = new THREE.SpriteMaterial({ map: brickTex });
 
             for(let i=0; i < 100; i++) {
@@ -235,7 +259,6 @@
                 plat.position.set(x, y, 1);
                 scene.add(plat);
                 
-                // Add to collision list
                 platforms.push({
                     pos: { x: x, y: y },
                     width: pWidth,
@@ -247,8 +270,7 @@
         }
 
         function spawnEnemy(x, y) {
-            const texture = textureLoader.load(SPRITES.enemy);
-            texture.magFilter = THREE.NearestFilter;
+            const texture = loadSafeTexture(SPRITES.enemy, '#ff4444');
             const material = new THREE.SpriteMaterial({ map: texture });
             const enemy = new THREE.Sprite(material);
             enemy.position.set(x, y, 2);
@@ -260,8 +282,7 @@
 
         function shoot() {
             if(!gameActive) return;
-            const texture = textureLoader.load(SPRITES.bullet);
-            texture.magFilter = THREE.NearestFilter;
+            const texture = loadSafeTexture(SPRITES.bullet, '#ffffff');
             const mat = new THREE.SpriteMaterial({ map: texture });
             const bullet = new THREE.Sprite(mat);
             bullet.position.copy(player.position);
@@ -278,7 +299,6 @@
                 return;
             }
 
-            // Player Movement
             if (keys['KeyA'] || keys['ArrowLeft']) {
                 player.position.x -= PLAYER_SPEED;
                 player.scale.x = -1.5;
@@ -291,7 +311,6 @@
             player.userData.vy += GRAVITY;
             player.position.y += player.userData.vy;
 
-            // Collision logic with Sprite Bounds
             player.userData.onGround = false;
             const pX = player.position.x;
             const pY = player.position.y;
@@ -300,7 +319,6 @@
             platforms.forEach(p => {
                 const halfW = p.width / 2;
                 const halfH = p.height / 2;
-                
                 const left = p.pos.x - halfW;
                 const right = p.pos.x + halfW;
                 const top = p.pos.y + halfH;
@@ -318,14 +336,12 @@
                 player.userData.vy = JUMP_FORCE;
             }
 
-            // Enemies
             enemies.forEach(en => {
                 en.position.x += en.userData.speed;
                 if(Math.abs(en.position.x - en.userData.startX) > en.userData.range) en.userData.speed *= -1;
                 if(player.position.distanceTo(en.position) < 0.9) gameOver();
             });
 
-            // Projectiles
             projectiles.forEach((p, idx) => {
                 p.position.x += p.userData.vx;
                 enemies.forEach((en, eIdx) => {
@@ -342,10 +358,7 @@
                 }
             });
 
-            // Camera follow
             camera.position.x += (player.position.x - camera.position.x) * 0.1;
-            
-            // Death plane
             if(player.position.y < -10) gameOver();
 
             renderer.render(scene, camera);
@@ -355,7 +368,6 @@
             document.getElementById('menu-screen').style.display = 'none';
             const introOverlay = document.getElementById('intro-overlay');
             const introVideo = document.getElementById('intro-video');
-            
             introOverlay.style.display = 'flex';
             introVideo.play().catch(e => { closeIntro(); });
             introVideo.onended = () => { closeIntro(); };
