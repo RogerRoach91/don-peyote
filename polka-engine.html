@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Retro Platformer Creator - BOSS BATTLE</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
     <style>
         body {
             margin: 0;
@@ -49,35 +50,38 @@
             background-position: center;
             z-index: 300;
             justify-content: flex-end; /* Push menu to bottom */
-            padding-bottom: 5vh;
+            padding-bottom: 8vh;
         }
         .menu-card {
-            background: rgba(0, 0, 0, 0.7);
-            padding: 1.5rem;
-            border-radius: 1rem;
-            border: 2px solid #22d3ee;
-            backdrop-filter: blur(10px);
+            background: rgba(0, 0, 0, 0.6);
+            padding: 1rem 2rem;
+            border-radius: 50px; /* More rounded for a playful feel */
+            border: none; /* Removed the blue border */
+            backdrop-filter: blur(12px);
             display: flex;
-            flex-direction: row; /* Landscape orientation */
-            gap: 1.5rem;
+            flex-direction: row; 
+            gap: 2rem;
             min-width: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         .menu-btn {
-            padding: 0.75rem 2rem;
+            padding: 0.5rem 1.5rem;
             background: transparent;
-            border: 1px solid rgba(255,255,255,0.3);
+            border: none;
             color: white;
-            font-weight: 900;
+            font-family: 'Luckiest Guy', cursive; /* Fun playful font */
+            font-size: 1.5rem;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            transition: all 0.2s;
+            letter-spacing: 0.05em;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             cursor: pointer;
             white-space: nowrap;
+            text-shadow: 2px 2px 0px #000;
         }
         .menu-btn:hover {
-            background: #22d3ee;
-            color: black;
-            transform: scale(1.05);
+            color: #22d3ee;
+            transform: scale(1.2) rotate(-2deg); /* Playful hover bounce */
+            text-shadow: 4px 4px 0px rgba(34, 211, 238, 0.3);
         }
 
         /* Intro Video */
@@ -87,11 +91,10 @@
             display: none;
         }
         
-        /* Match video size to menu image size for seamless transition */
         #intro-video {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* Ensures video fills same area as background-size: cover */
+            object-fit: cover;
         }
         
         #game-overlay {
@@ -143,20 +146,17 @@
         
         <!-- 1. START MENU SCREEN -->
         <div id="menu-screen" class="full-overlay">
-            <!-- Title removed as requested -->
             <div class="menu-card">
                 <button onclick="onNewGame()" class="menu-btn">New Game</button>
-                <button onclick="showMessage('Load Game feature coming soon!')" class="menu-btn">Load Game</button>
-                <button onclick="showMessage('Options: Master Volume 100%')" class="menu-btn">Options</button>
+                <button onclick="showMessage('Coming Soon!')" class="menu-btn">Load Game</button>
+                <button onclick="showMessage('Master Volume 100%')" class="menu-btn">Options</button>
             </div>
         </div>
 
         <!-- 2. INTRO VIDEO OVERLAY -->
         <div id="intro-overlay" class="full-overlay">
-            <!-- Unskippable video, scaled to cover -->
             <video id="intro-video" preload="auto">
                 <source src="https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-start-screen-grok.mp4" type="video/mp4">
-                Your browser does not support the video tag.
             </video>
         </div>
 
@@ -183,7 +183,6 @@
             <div class="text-[10px] font-bold opacity-60 uppercase tracking-wider">Arrows / WASD: Move</div>
             <div class="text-[10px] font-bold opacity-60 uppercase tracking-wider">Space / W: Jump</div>
             <div class="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">F / Enter: Shoot</div>
-            <div id="mode-indicator" class="text-cyan-400 font-black text-sm mt-1 uppercase tracking-tighter">Play Mode</div>
             <button onclick="toggleMusic()" id="music-btn" class="mt-2 text-[10px] bg-white/10 hover:bg-white/20 px-2 py-1 rounded border border-white/20 uppercase font-bold tracking-widest">Toggle Music: OFF</button>
         </div>
     </div>
@@ -204,16 +203,11 @@
         const msgBox = document.getElementById('message-box');
         const hudPanel = document.getElementById('hud-panel');
 
-        // --- MENU LOGIC ---
         function onNewGame() {
             menuScreen.style.display = 'none';
             introOverlay.style.display = 'flex';
-            introVideo.play().catch(e => {
-                console.log("Auto-play blocked, waiting for interaction");
-            });
-            introVideo.onended = () => {
-                closeIntro();
-            };
+            introVideo.play().catch(e => { console.log("Video block"); });
+            introVideo.onended = () => { closeIntro(); };
         }
 
         function showMessage(text) {
@@ -230,7 +224,6 @@
             if (!isMusicPlaying) toggleMusic();
         }
 
-        // --- AUDIO ENGINE ---
         let audioCtx = null;
         let isMusicPlaying = false;
         let musicTimer = null;
@@ -264,10 +257,8 @@
             const isBoss = (LEVELS[currentLevelIndex] && LEVELS[currentLevelIndex].isBoss);
             const currentMelody = isBoss ? bossMelody : melody;
             const tempo = isBoss ? 0.12 : 0.15;
-            
             if (step % 2 === 0) playNote(currentMelody[step % 4] / 2, now, 0.4, 'triangle', 0.15);
             playNote(currentMelody[step % currentMelody.length], now, 0.2, isBoss ? 'sawtooth' : 'square', 0.05);
-            
             step++;
             musicTimer = setTimeout(musicLoop, tempo * 1000);
         }
@@ -285,7 +276,6 @@
             }
         }
 
-        // --- SPRITES ---
         const SPRITES = {
             player: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/25.png', 
             enemy: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/129.png',
@@ -305,7 +295,6 @@
             }
         }
 
-        // Physics
         const TILE_SIZE = 40;
         const GRAVITY = 0.7;
         const FRICTION = 0.82;
@@ -451,9 +440,7 @@
 
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
-            if (e.code === 'KeyF' || e.code === 'Enter') {
-                shoot();
-            }
+            if (e.code === 'KeyF' || e.code === 'Enter') shoot();
         });
         window.addEventListener('keyup', e => keys[e.code] = false);
 
@@ -469,7 +456,6 @@
 
         function update() {
             if (!gameActive) return;
-
             const moveLeft = keys['ArrowLeft'] || keys['KeyA'];
             const moveRight = keys['ArrowRight'] || keys['KeyD'];
 
@@ -479,7 +465,6 @@
 
             player.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.vx));
             player.vy += GRAVITY;
-
             player.x += player.vx;
             handleCollision(true);
             player.y += player.vy;
@@ -504,19 +489,14 @@
                 const tx = Math.floor(p.x / TILE_SIZE);
                 const ty = Math.floor(p.y / TILE_SIZE);
                 if (world[ty] && world[ty][tx] > 0 && world[ty][tx] !== 4) p.active = false;
-
                 enemies.forEach(en => {
                     if (!en.dead && checkOverlap(p, en)) {
-                        en.dead = true;
-                        p.active = false;
+                        en.dead = true; p.active = false;
                         playNote(110, audioCtx?.currentTime || 0, 0.1, 'sawtooth', 0.1);
                     }
                 });
-
                 if (boss && boss.invuln === 0 && checkOverlap(p, boss)) {
-                    boss.hp--;
-                    boss.invuln = 15;
-                    p.active = false;
+                    boss.hp--; boss.invuln = 15; p.active = false;
                     hpFill.style.width = (boss.hp / boss.maxHp * 100) + '%';
                     if (boss.hp <= 0) victory();
                     playNote(220, audioCtx?.currentTime || 0, 0.05, 'square', 0.1);
@@ -530,7 +510,6 @@
                 const col = Math.floor((en.vx > 0 ? en.x + en.width : en.x) / TILE_SIZE);
                 const row = Math.floor((en.y + en.height / 2) / TILE_SIZE);
                 if (world[row] && world[row][col] > 0) en.vx *= -1;
-
                 if (checkOverlap(player, en)) {
                     if (player.vy > 0 && player.y + player.height < en.y + 15) {
                         en.dead = true; player.vy = -10;
@@ -543,20 +522,15 @@
                 boss.x += boss.vx;
                 boss.vy += 0.2;
                 boss.y += boss.vy;
-
                 if (boss.x > player.x + 50) boss.vx = -2.5;
                 else if (boss.x < player.x - 50) boss.vx = 2.5;
-
                 if (boss.y + boss.height > (ROWS - 1) * TILE_SIZE) {
                     boss.y = (ROWS - 1) * TILE_SIZE - boss.height;
                     boss.vy = -Math.random() * 5; 
                 }
-
                 if (checkOverlap(player, boss)) {
                     if (player.vy > 0 && player.y + player.height < boss.y + 30 && boss.invuln === 0) {
-                        boss.hp--;
-                        boss.invuln = 60;
-                        player.vy = -12;
+                        boss.hp--; boss.invuln = 60; player.vy = -12;
                         hpFill.style.width = (boss.hp / boss.maxHp * 100) + '%';
                         if (boss.hp <= 0) victory();
                     } else if (boss.invuln === 0) gameOver();
@@ -566,7 +540,6 @@
             let targetCam = player.x - canvas.width / 2;
             cameraX += (targetCam - cameraX) * 0.1;
             cameraX = Math.max(0, Math.min(cameraX, COLS * TILE_SIZE - canvas.width));
-
             if (player.y > canvas.height) gameOver();
         }
 
@@ -586,7 +559,6 @@
             const x2 = Math.floor((isX ? player.x + player.width : player.x + player.width - COLLISION_MARGIN) / TILE_SIZE);
             const y1 = Math.floor((isX ? player.y + COLLISION_MARGIN : player.y) / TILE_SIZE);
             const y2 = Math.floor((isX ? player.y + player.height - COLLISION_MARGIN : player.y + player.height) / TILE_SIZE);
-
             for (let r = y1; r <= y2; r++) {
                 for (let c = x1; c <= x2; c++) {
                     if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
@@ -610,20 +582,16 @@
         }
 
         function safeDrawImage(img, ...args) {
-            if (img && img.complete && img.naturalWidth !== 0) {
-                ctx.drawImage(img, ...args);
-            } else {
+            if (img && img.complete && img.naturalWidth !== 0) ctx.drawImage(img, ...args);
+            else {
                 const [x, y, w, h] = args.length === 4 ? args : [args[0], args[1], TILE_SIZE, TILE_SIZE];
-                ctx.fillStyle = '#ff00ff';
-                ctx.fillRect(x, y, w || TILE_SIZE, h || TILE_SIZE);
+                ctx.fillStyle = '#ff00ff'; ctx.fillRect(x, y, w || TILE_SIZE, h || TILE_SIZE);
             }
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.save();
-            ctx.translate(-Math.floor(cameraX), 0);
-
+            ctx.save(); ctx.translate(-Math.floor(cameraX), 0);
             for (let r = 0; r < ROWS; r++) {
                 for (let c = Math.floor(cameraX/TILE_SIZE); c < Math.floor((cameraX+canvas.width)/TILE_SIZE)+1; c++) {
                     if (c >= COLS) break;
@@ -637,31 +605,14 @@
                     }
                 }
             }
-
             enemies.forEach(en => { if (!en.dead) safeDrawImage(images.enemy, en.x, en.y, en.width, en.height); });
-
             ctx.fillStyle = '#FFFF00';
-            projectiles.forEach(p => {
-                ctx.fillRect(p.x, p.y, p.width, p.height);
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = "yellow";
-                ctx.fillRect(p.x, p.y, p.width, p.height);
-                ctx.shadowBlur = 0;
-            });
-
-            if (boss) {
-                if (boss.invuln % 10 < 5) {
-                    safeDrawImage(images.boss, boss.x, boss.y, boss.width, boss.height);
-                }
-            }
-
+            projectiles.forEach(p => { ctx.fillRect(p.x, p.y, p.width, p.height); });
+            if (boss && boss.invuln % 10 < 5) safeDrawImage(images.boss, boss.x, boss.y, boss.width, boss.height);
             if (!player.facingRight) {
                 ctx.save(); ctx.translate(player.x + player.width, player.y); ctx.scale(-1, 1);
                 safeDrawImage(images.player, 0, 0, player.width, player.height); ctx.restore();
-            } else {
-                safeDrawImage(images.player, player.x, player.y, player.width, player.height);
-            }
-            
+            } else safeDrawImage(images.player, player.x, player.y, player.width, player.height);
             ctx.restore();
             update();
             requestAnimationFrame(draw);
@@ -673,7 +624,6 @@
             if (h > window.innerHeight) { h = window.innerHeight; w = h * ratio; }
             canvas.style.width = Math.floor(w) + 'px'; canvas.style.height = Math.floor(h) + 'px';
         }
-
         window.addEventListener('resize', resize);
         window.onload = () => { loadImages(); initWorld(); resize(); draw(); };
     </script>
