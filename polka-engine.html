@@ -159,7 +159,7 @@
         let player, enemies = [], platforms = [], projectiles = [], boss = null;
         let keys = {};
         let gameActive = false;
-        let worldWidth = 200;
+        let worldWidth = 500;
         
         const textureLoader = new THREE.TextureLoader();
         const SPRITES = {
@@ -171,15 +171,14 @@
         };
 
         const PLAYER_SPEED = 0.15;
-        const JUMP_FORCE = 0.25;
-        const GRAVITY = -0.01;
+        const JUMP_FORCE = 0.28;
+        const GRAVITY = -0.012;
 
         // --- INITIALIZATION ---
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x87CEEB);
 
-            // Use Orthographic Camera for 2D look
             const aspect = window.innerWidth / window.innerHeight;
             const viewSize = 10;
             camera = new THREE.OrthographicCamera(
@@ -190,11 +189,10 @@
             camera.position.set(0, 5, 10);
             camera.lookAt(0, 5, 0);
 
-            renderer = new THREE.WebGLRenderer({ antialias: false }); // Pixel art looks better without AA
+            renderer = new THREE.WebGLRenderer({ antialias: false });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // Lighting (Still useful for MeshBasicMaterial or Phong with sprites)
             const ambient = new THREE.AmbientLight(0xffffff, 1.0);
             scene.add(ambient);
 
@@ -217,13 +215,13 @@
             const material = new THREE.SpriteMaterial({ map: texture });
             player = new THREE.Sprite(material);
             player.scale.set(1.5, 1.5, 1);
-            player.position.set(0, 5, 0);
-            player.userData = { vy: 0, onGround: false, width: 1.2, height: 1.2 };
+            player.position.set(0, 5, 0); // Start safely above ground
+            player.userData = { vy: 0, onGround: false, radius: 0.6 };
             scene.add(player);
         }
 
         function createLevel() {
-            // Ground Sprite Loop
+            // Main Floor
             const grassTex = textureLoader.load(SPRITES.grass);
             grassTex.wrapS = THREE.RepeatWrapping;
             grassTex.repeat.set(worldWidth / 2, 1);
@@ -232,18 +230,20 @@
             const groundGeo = new THREE.PlaneGeometry(worldWidth, 2);
             const groundMat = new THREE.MeshBasicMaterial({ map: grassTex, transparent: true });
             const ground = new THREE.Mesh(groundGeo, groundMat);
-            ground.position.y = 0;
+            ground.position.y = 1; // Floor top is at y=2
             scene.add(ground);
             platforms.push(ground);
 
-            // Floating Platforms as Sprites
+            // Floating Platforms
             const brickTex = textureLoader.load(SPRITES.brick);
             brickTex.magFilter = THREE.NearestFilter;
             
-            for(let i=0; i < 40; i++) {
-                const x = Math.random() * worldWidth - 50;
-                const y = Math.random() * 8 + 3;
-                const width = 2;
+            for(let i=0; i < 60; i++) {
+                const x = (Math.random() * worldWidth) - (worldWidth/2);
+                if (Math.abs(x) < 5) continue; // Keep starting area clear
+                
+                const y = Math.random() * 8 + 4;
+                const width = 2.5;
                 
                 const platGeo = new THREE.PlaneGeometry(width, 0.8);
                 const platMat = new THREE.MeshBasicMaterial({ map: brickTex, transparent: true });
@@ -252,7 +252,7 @@
                 scene.add(plat);
                 platforms.push(plat);
 
-                if(Math.random() > 0.7) spawnEnemy(x, y + 1.2);
+                if(Math.random() > 0.6) spawnEnemy(x, y + 1.2);
             }
         }
 
@@ -263,7 +263,7 @@
             const enemy = new THREE.Sprite(material);
             enemy.position.set(x, y, 0);
             enemy.scale.set(1.2, 1.2, 1);
-            enemy.userData = { speed: 0.05, range: 4, startX: x };
+            enemy.userData = { speed: 0.04 + Math.random() * 0.03, range: 4, startX: x };
             scene.add(enemy);
             enemies.push(enemy);
         }
@@ -275,8 +275,9 @@
             const mat = new THREE.SpriteMaterial({ map: texture });
             const bullet = new THREE.Sprite(mat);
             bullet.position.copy(player.position);
-            bullet.scale.set(0.5, 0.5, 1);
-            bullet.userData = { vx: 0.4 }; 
+            bullet.scale.set(0.6, 0.6, 1);
+            // Direction based on sprite scale flip
+            bullet.userData = { vx: player.scale.x > 0 ? 0.4 : -0.4 }; 
             scene.add(bullet);
             projectiles.push(bullet);
         }
@@ -294,7 +295,7 @@
             // Player Movement
             if (keys['KeyA'] || keys['ArrowLeft']) {
                 player.position.x -= PLAYER_SPEED;
-                player.scale.x = -1.5; // Flip sprite
+                player.scale.x = -1.5;
             }
             if (keys['KeyD'] || keys['ArrowRight']) {
                 player.position.x += PLAYER_SPEED;
@@ -304,19 +305,26 @@
             player.userData.vy += GRAVITY;
             player.position.y += player.userData.vy;
 
-            // Simple AABB Collision for 2D
+            // Robust AABB Collision
             player.userData.onGround = false;
+            const pX = player.position.x;
+            const pY = player.position.y;
+            const pRadius = 0.6; // Vertical hit offset
+
             platforms.forEach(p => {
                 const pWidth = p.geometry.parameters.width;
                 const pHeight = p.geometry.parameters.height;
                 
-                const pxMin = p.position.x - pWidth/2;
-                const pxMax = p.position.x + pWidth/2;
-                const pyMax = p.position.y + pHeight/2;
+                const left = p.position.x - pWidth/2;
+                const right = p.position.x + pWidth/2;
+                const top = p.position.y + pHeight/2;
+                const bottom = p.position.y - pHeight/2;
 
-                if (player.position.x > pxMin - 0.5 && player.position.x < pxMax + 0.5) {
-                    if (player.position.y - 0.6 <= pyMax && player.position.y > p.position.y && player.userData.vy <= 0) {
-                        player.position.y = pyMax + 0.6;
+                // Horizontal check
+                if (pX > left - 0.4 && pX < right + 0.4) {
+                    // Vertical check for falling onto platform
+                    if (pY - pRadius <= top && pY > p.position.y && player.userData.vy <= 0) {
+                        player.position.y = top + pRadius;
                         player.userData.vy = 0;
                         player.userData.onGround = true;
                     }
@@ -332,7 +340,7 @@
                 en.position.x += en.userData.speed;
                 if(Math.abs(en.position.x - en.userData.startX) > en.userData.range) en.userData.speed *= -1;
                 
-                if(player.position.distanceTo(en.position) < 0.8) {
+                if(player.position.distanceTo(en.position) < 0.9) {
                     gameOver();
                 }
             });
@@ -341,20 +349,20 @@
             projectiles.forEach((p, idx) => {
                 p.position.x += p.userData.vx;
                 enemies.forEach((en, eIdx) => {
-                    if(p.position.distanceTo(en.position) < 0.8) {
+                    if(p.position.distanceTo(en.position) < 0.9) {
                         scene.remove(en);
                         enemies.splice(eIdx, 1);
                         scene.remove(p);
                         projectiles.splice(idx, 1);
                     }
                 });
-                if(p.position.x > player.position.x + 25) {
+                if(Math.abs(p.position.x - player.position.x) > 30) {
                     scene.remove(p);
                     projectiles.splice(idx, 1);
                 }
             });
 
-            // Camera follow (fixed Y height for 2D scrolling feel)
+            // Camera follow
             camera.position.x += (player.position.x - camera.position.x) * 0.1;
             
             // Death plane
@@ -369,7 +377,10 @@
             const introVideo = document.getElementById('intro-video');
             
             introOverlay.style.display = 'flex';
-            introVideo.play().catch(e => { console.log("Video block"); });
+            introVideo.play().catch(e => { 
+                console.log("Video block, skipping to game");
+                closeIntro(); 
+            });
             introVideo.onended = () => { closeIntro(); };
         }
 
