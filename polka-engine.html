@@ -3,36 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Retro Platformer Creator - BOSS BATTLE</title>
+    <title>3D Sprite Engine - WebGL</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background: #000;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            touch-action: none;
-        }
-        canvas {
-            display: block;
-            image-rendering: pixelated;
-            background: #87CEEB;
-            box-shadow: 0 0 30px rgba(0,0,0,0.6);
-            margin: auto;
-        }
-        .ui-panel {
-            background: rgba(0, 0, 0, 0.85);
-            color: white;
-            padding: 15px;
-            border-radius: 12px;
-            pointer-events: auto;
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255,255,255,0.15);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Luckiest Guy', cursive; }
+        canvas { display: block; }
         
-        /* Overlays */
         .full-overlay {
             position: absolute;
             inset: 0;
@@ -41,591 +19,320 @@
             align-items: center;
             justify-content: center;
             z-index: 100;
+            pointer-events: none;
         }
 
-        /* Menu Screen */
         #menu-screen {
-            background-image: url('https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-start-screen.png');
-            background-size: cover;
-            background-position: center;
+            background: linear-gradient(to bottom, #1e3a8a, #000);
             z-index: 300;
-            justify-content: flex-end; /* Push menu to bottom */
-            padding-bottom: 8vh;
+            pointer-events: auto;
+            justify-content: center;
         }
+
         .menu-card {
-            background: rgba(0, 0, 0, 0.6);
-            padding: 1rem 2rem;
-            border-radius: 50px; /* More rounded for a playful feel */
-            border: none; /* Removed the blue border */
-            backdrop-filter: blur(12px);
+            background: rgba(0, 0, 0, 0.4);
+            padding: 2rem;
+            border-radius: 30px;
+            backdrop-filter: blur(10px);
             display: flex;
-            flex-direction: row; 
-            gap: 2rem;
-            min-width: auto;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            flex-direction: column;
+            gap: 1.5rem;
+            box-shadow: 0 0 50px rgba(0,255,255,0.2);
+            text-align: center;
         }
+
         .menu-btn {
-            padding: 0.5rem 1.5rem;
-            background: transparent;
-            border: none;
-            color: white;
-            font-family: 'Luckiest Guy', cursive; /* Fun playful font */
-            font-size: 1.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            padding: 0.75rem 2rem;
+            background: white;
+            color: #1e3a8a;
+            border-radius: 15px;
+            font-size: 1.8rem;
+            transition: all 0.2s;
             cursor: pointer;
-            white-space: nowrap;
-            text-shadow: 2px 2px 0px #000;
-        }
-        .menu-btn:hover {
-            color: #22d3ee;
-            transform: scale(1.2) rotate(-2deg); /* Playful hover bounce */
-            text-shadow: 4px 4px 0px rgba(34, 211, 238, 0.3);
+            pointer-events: auto;
         }
 
-        /* Intro Video */
-        #intro-overlay {
-            background: black;
-            z-index: 200;
-            display: none;
-        }
-        
-        #intro-video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        #game-overlay {
-            background: rgba(0,0,0,0.85);
-            display: none;
+        .menu-btn:hover {
+            transform: scale(1.1) rotate(-2deg);
+            background: #22d3ee;
             color: white;
         }
 
-        #boss-ui {
-            display: none;
+        #game-ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            pointer-events: none;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        #boss-hp-container {
             position: absolute;
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
             width: 300px;
-            text-align: center;
+            display: none;
         }
+
         .hp-bar {
-            height: 12px;
+            height: 20px;
             background: #441111;
-            border: 2px solid white;
-            border-radius: 6px;
+            border: 3px solid white;
+            border-radius: 10px;
             overflow: hidden;
         }
+
         #hp-fill {
             height: 100%;
             background: #ff0000;
             width: 100%;
-            transition: width 0.3s ease;
+            transition: width 0.3s;
         }
+
         #message-box {
             position: fixed;
-            bottom: 20px;
+            bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            background: #22d3ee;
-            color: black;
+            background: #facc15;
             padding: 10px 20px;
-            border-radius: 5px;
-            font-weight: bold;
+            border-radius: 10px;
+            font-size: 1.2rem;
             display: none;
-            z-index: 500;
         }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center h-screen">
+<body>
 
-    <div id="game-container" class="relative w-screen h-screen">
-        
-        <!-- 1. START MENU SCREEN -->
-        <div id="menu-screen" class="full-overlay">
-            <div class="menu-card">
-                <button onclick="onNewGame()" class="menu-btn">New Game</button>
-                <button onclick="showMessage('Coming Soon!')" class="menu-btn">Load Game</button>
-                <button onclick="showMessage('Master Volume 100%')" class="menu-btn">Options</button>
-            </div>
+    <div id="menu-screen" class="full-overlay">
+        <h1 class="text-7xl text-white mb-8 tracking-wider">WEBGL ADVENTURE</h1>
+        <div class="menu-card">
+            <button onclick="startGame()" class="menu-btn">New Game</button>
+            <button onclick="showMessage('Save disabled in Demo')" class="menu-btn">Load Game</button>
+            <button onclick="showMessage('Graphics: Ultra')" class="menu-btn">Options</button>
         </div>
+    </div>
 
-        <!-- 2. INTRO VIDEO OVERLAY -->
-        <div id="intro-overlay" class="full-overlay">
-            <video id="intro-video" preload="auto">
-                <source src="https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-start-screen-grok.mp4" type="video/mp4">
-            </video>
-        </div>
+    <div id="game-ui" class="hidden">
+        <div id="level-name" class="text-3xl text-cyan-400">Level 1: 3D Plains</div>
+        <div class="text-sm opacity-80">WASD to Move | Space to Jump | Click to Shoot</div>
+    </div>
 
-        <!-- 3. GAME CANVAS -->
-        <canvas id="gameCanvas"></canvas>
-        
-        <div id="boss-ui">
-            <div class="text-white font-black uppercase text-xs mb-1 tracking-widest">Gyarados Boss</div>
-            <div class="hp-bar"><div id="hp-fill"></div></div>
-        </div>
-
-        <!-- 4. GAME OVER/VICTORY OVERLAY -->
-        <div id="game-overlay" class="full-overlay">
-            <h1 id="overlay-title" class="text-6xl font-black mb-8 tracking-tighter italic text-center">GAME OVER</h1>
-            <div id="overlay-sub" class="text-xl mb-8 opacity-80 font-bold uppercase tracking-widest text-center"></div>
-            <button id="overlay-btn" onclick="resetGame()" class="px-10 py-4 bg-white text-black font-black rounded-full hover:bg-yellow-400 transition-all active:scale-90 uppercase tracking-widest shadow-lg">Try Again</button>
-        </div>
-
-        <!-- 5. HUD -->
-        <div id="hud-panel" class="absolute top-4 left-4 ui-panel flex flex-col gap-1 hidden">
-            <div class="text-xl font-black italic uppercase text-yellow-400">Sprite Engine</div>
-            <div id="level-display" class="text-sm font-bold text-white uppercase tracking-widest mb-1">Level 1: Green Hills</div>
-            <div class="h-px bg-white/20 my-1"></div>
-            <div class="text-[10px] font-bold opacity-60 uppercase tracking-wider">Arrows / WASD: Move</div>
-            <div class="text-[10px] font-bold opacity-60 uppercase tracking-wider">Space / W: Jump</div>
-            <div class="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">F / Enter: Shoot</div>
-            <button onclick="toggleMusic()" id="music-btn" class="mt-2 text-[10px] bg-white/10 hover:bg-white/20 px-2 py-1 rounded border border-white/20 uppercase font-bold tracking-widest">Toggle Music: OFF</button>
-        </div>
+    <div id="boss-hp-container">
+        <div class="text-center text-white mb-1 uppercase">Gyarados Overlord</div>
+        <div class="hp-bar"><div id="hp-fill"></div></div>
     </div>
 
     <div id="message-box"></div>
 
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const menuScreen = document.getElementById('menu-screen');
-        const introOverlay = document.getElementById('intro-overlay');
-        const introVideo = document.getElementById('intro-video');
-        const overlay = document.getElementById('game-overlay');
-        const levelDisplay = document.getElementById('level-display');
-        const musicBtn = document.getElementById('music-btn');
-        const bossUI = document.getElementById('boss-ui');
-        const hpFill = document.getElementById('hp-fill');
-        const msgBox = document.getElementById('message-box');
-        const hudPanel = document.getElementById('hud-panel');
+        // --- CONFIG & STATE ---
+        let scene, camera, renderer, clock;
+        let player, enemies = [], platforms = [], projectiles = [], boss = null;
+        let keys = {};
+        let gameActive = false;
+        let worldWidth = 200;
+        
+        const PLAYER_SPEED = 0.15;
+        const JUMP_FORCE = 0.25;
+        const GRAVITY = -0.01;
 
-        function onNewGame() {
-            menuScreen.style.display = 'none';
-            introOverlay.style.display = 'flex';
-            introVideo.play().catch(e => { console.log("Video block"); });
-            introVideo.onended = () => { closeIntro(); };
+        // --- INITIALIZATION ---
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 20, 50);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 12);
+            camera.lookAt(0, 2, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambient);
+
+            const sun = new THREE.DirectionalLight(0xffffff, 1);
+            sun.position.set(10, 20, 10);
+            sun.castShadow = true;
+            scene.add(sun);
+
+            clock = new THREE.Clock();
+
+            createLevel();
+            createPlayer();
+            
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('keydown', e => keys[e.code] = true);
+            window.addEventListener('keyup', e => keys[e.code] = false);
+            window.addEventListener('mousedown', shoot);
+
+            animate();
         }
 
-        function showMessage(text) {
-            msgBox.innerText = text;
-            msgBox.style.display = 'block';
-            setTimeout(() => { msgBox.style.display = 'none'; }, 2000);
+        function createPlayer() {
+            const geometry = new THREE.SphereGeometry(0.6, 32, 32);
+            const material = new THREE.MeshPhongMaterial({ color: 0xffff00 });
+            player = new THREE.Mesh(geometry, material);
+            player.position.set(0, 2, 0);
+            player.castShadow = true;
+            player.userData = { vy: 0, onGround: false, radius: 0.6 };
+            scene.add(player);
         }
 
-        function closeIntro() {
-            introVideo.pause();
-            introOverlay.style.display = 'none';
-            hudPanel.classList.remove('hidden');
-            gameActive = true;
-            if (!isMusicPlaying) toggleMusic();
-        }
+        function createLevel() {
+            // Ground
+            const groundGeo = new THREE.BoxGeometry(worldWidth, 2, 4);
+            const groundMat = new THREE.MeshPhongMaterial({ color: 0x228b22 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.position.y = -1;
+            ground.receiveShadow = true;
+            scene.add(ground);
+            platforms.push(ground);
 
-        let audioCtx = null;
-        let isMusicPlaying = false;
-        let musicTimer = null;
-        let step = 0;
+            // Decorative Clouds/Obstacles
+            for(let i=0; i < 40; i++) {
+                const x = Math.random() * worldWidth - 50;
+                const y = Math.random() * 5 + 2;
+                const size = Math.random() * 2 + 1;
+                
+                const boxGeo = new THREE.BoxGeometry(size, 0.5, 2);
+                const boxMat = new THREE.MeshPhongMaterial({ color: 0xffffff });
+                const plat = new THREE.Mesh(boxGeo, boxMat);
+                plat.position.set(x, y, 0);
+                plat.castShadow = true;
+                plat.receiveShadow = true;
+                scene.add(plat);
+                platforms.push(plat);
 
-        function initAudio() {
-            if (audioCtx) return;
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-
-        function playNote(freq, startTime, duration, type = 'square', vol = 0.1) {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = type;
-            osc.frequency.setValueAtTime(freq, startTime);
-            gain.gain.setValueAtTime(vol, startTime);
-            gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start(startTime);
-            osc.stop(startTime + duration);
-        }
-
-        const melody = [261.63, 293.66, 329.63, 349.23, 392.00, 329.63, 261.63, 293.66, 392.00, 349.23, 329.63, 261.63, 293.66, 261.63, 196.00, 261.63];
-        const bossMelody = [130.81, 138.59, 130.81, 123.47, 130.81, 138.59, 146.83, 155.56];
-
-        function musicLoop() {
-            if (!isMusicPlaying) return;
-            const now = audioCtx.currentTime;
-            const isBoss = (LEVELS[currentLevelIndex] && LEVELS[currentLevelIndex].isBoss);
-            const currentMelody = isBoss ? bossMelody : melody;
-            const tempo = isBoss ? 0.12 : 0.15;
-            if (step % 2 === 0) playNote(currentMelody[step % 4] / 2, now, 0.4, 'triangle', 0.15);
-            playNote(currentMelody[step % currentMelody.length], now, 0.2, isBoss ? 'sawtooth' : 'square', 0.05);
-            step++;
-            musicTimer = setTimeout(musicLoop, tempo * 1000);
-        }
-
-        function toggleMusic() {
-            initAudio();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            isMusicPlaying = !isMusicPlaying;
-            if (isMusicPlaying) {
-                musicBtn.innerText = "Toggle Music: ON";
-                musicLoop();
-            } else {
-                musicBtn.innerText = "Toggle Music: OFF";
-                clearTimeout(musicTimer);
-            }
-        }
-
-        const SPRITES = {
-            player: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/25.png', 
-            enemy: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/129.png',
-            boss: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/130.png',
-            brick: 'https://raw.githubusercontent.com/Aris-F/Pixel-Art-Assets/main/Tiles/Brick.png',
-            grass: 'https://raw.githubusercontent.com/Aris-F/Pixel-Art-Assets/main/Tiles/Grass.png',
-            coin: 'https://raw.githubusercontent.com/Aris-F/Pixel-Art-Assets/main/Items/Coin.png'
-        };
-
-        const images = {};
-        function loadImages() {
-            for (let key in SPRITES) {
-                const img = new Image();
-                img.crossOrigin = "anonymous";
-                img.src = SPRITES[key];
-                images[key] = img;
-            }
-        }
-
-        const TILE_SIZE = 40;
-        const GRAVITY = 0.7;
-        const FRICTION = 0.82;
-        const AIR_RES = 0.94;
-        const JUMP_FORCE = -14.5;
-        const ACCEL = 0.9;
-        const MAX_SPEED = 6;
-        const COLLISION_MARGIN = 4;
-
-        canvas.width = 800;
-        canvas.height = 480;
-
-        let currentLevelIndex = 0;
-        let cameraX = 0;
-        let gameActive = false; 
-        const keys = {};
-
-        const player = {
-            x: 100, y: 300, width: 32, height: 32, vx: 0, vy: 0,
-            onGround: false, coyoteTime: 0, facingRight: true,
-            shootCooldown: 0
-        };
-
-        let enemies = [];
-        let projectiles = [];
-        let boss = null;
-        const world = [];
-        const ROWS = canvas.height / TILE_SIZE;
-        const COLS = 150; 
-
-        const LEVELS = [
-            {
-                name: "Level 1: Green Hills",
-                bgColor: "#87CEEB",
-                setup: (w) => {
-                    for(let c=0; c<COLS; c++) {
-                        w[ROWS-1][c] = 2;
-                        if (c > 20 && c % 15 === 0) {
-                            w[ROWS-4][c] = 3;
-                            spawnEnemy(c * TILE_SIZE, (ROWS - 2) * TILE_SIZE);
-                        }
-                    }
-                    w[ROWS-2][140] = 4;
-                }
-            },
-            {
-                name: "Level 2: Floating Islands",
-                bgColor: "#4A90E2",
-                setup: (w) => {
-                    for(let c=0; c<COLS; c++) {
-                        if (c % 8 < 4) w[ROWS-1][c] = 1;
-                        if (c % 12 === 0 && c > 10) {
-                            w[ROWS-4][c] = 1; w[ROWS-4][c+1] = 1;
-                            spawnEnemy((c+1) * TILE_SIZE, (ROWS - 5) * TILE_SIZE);
-                        }
-                        if (c % 15 === 5) w[ROWS-6][c] = 3;
-                    }
-                    w[ROWS-2][140] = 4;
-                }
-            },
-            {
-                name: "Level 3: The Fortress",
-                bgColor: "#2C3E50",
-                setup: (w) => {
-                    for(let c=0; c<COLS; c++) {
-                        w[ROWS-1][c] = 1; w[0][c] = 1;
-                        if (c % 10 === 0 && c > 5) {
-                            for(let r=1; r<ROWS-5; r++) w[r][c] = 1;
-                            spawnEnemy(c * TILE_SIZE + 80, (ROWS - 2) * TILE_SIZE);
-                        }
-                    }
-                    w[ROWS-2][140] = 4;
-                }
-            },
-            {
-                name: "FINAL BOSS: THE ABYSS",
-                bgColor: "#1a1a1a",
-                isBoss: true,
-                setup: (w) => {
-                    for(let c=0; c<30; c++) w[ROWS-1][c] = 1; 
-                    boss = { 
-                        x: 600, y: 100, width: 120, height: 120, 
-                        vx: -2, vy: 0, hp: 10, maxHp: 10, invuln: 0 
-                    };
-                }
-            }
-        ];
-
-        function initWorld() {
-            enemies = [];
-            projectiles = [];
-            boss = null;
-            bossUI.style.display = 'none';
-            for (let r = 0; r < ROWS; r++) {
-                world[r] = [];
-                for (let c = 0; c < COLS; c++) world[r][c] = 0;
-            }
-            if (LEVELS[currentLevelIndex]) {
-                LEVELS[currentLevelIndex].setup(world);
-                canvas.style.background = LEVELS[currentLevelIndex].bgColor;
-                levelDisplay.innerText = LEVELS[currentLevelIndex].name;
-                if (LEVELS[currentLevelIndex].isBoss) {
-                    bossUI.style.display = 'block';
-                    hpFill.style.width = '100%';
-                }
+                if(Math.random() > 0.7) spawnEnemy(x, y + 1);
             }
         }
 
         function spawnEnemy(x, y) {
-            enemies.push({ x, y, width: 32, height: 32, vx: -2.5, dead: false });
+            const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+            const material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+            const enemy = new THREE.Mesh(geometry, material);
+            enemy.position.set(x, y, 0);
+            enemy.castShadow = true;
+            enemy.userData = { speed: 0.05, range: 3, startX: x };
+            scene.add(enemy);
+            enemies.push(enemy);
         }
 
         function shoot() {
-            if (!gameActive || player.shootCooldown > 0) return;
-            const dir = player.facingRight ? 1 : -1;
-            projectiles.push({
-                x: player.x + (player.facingRight ? player.width : -10),
-                y: player.y + player.height / 2 - 4,
-                vx: dir * 10,
-                width: 12,
-                height: 8,
-                active: true
-            });
-            player.shootCooldown = 20;
-            playNote(880, audioCtx?.currentTime || 0, 0.05, 'triangle', 0.05);
+            if(!gameActive) return;
+            const geo = new THREE.SphereGeometry(0.2, 8, 8);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const bullet = new THREE.Mesh(geo, mat);
+            bullet.position.copy(player.position);
+            bullet.userData = { vx: 0.5 }; 
+            scene.add(bullet);
+            projectiles.push(bullet);
         }
 
-        function nextLevel() {
-            currentLevelIndex++;
-            if (currentLevelIndex >= LEVELS.length) victory();
-            else resetGame();
-        }
-
-        function victory() {
-            gameActive = false;
-            overlay.style.display = 'flex';
-            document.getElementById('overlay-title').innerText = "GRAND VICTORY!";
-            document.getElementById('overlay-title').className = "text-6xl font-black mb-4 tracking-tighter italic text-yellow-400";
-            document.getElementById('overlay-sub').innerText = "You defeated the Boss and saved the Pixel World!";
-            document.getElementById('overlay-btn').innerText = "Replay All";
-            currentLevelIndex = 0;
-        }
-
-        window.addEventListener('keydown', e => {
-            keys[e.code] = true;
-            if (e.code === 'KeyF' || e.code === 'Enter') shoot();
-        });
-        window.addEventListener('keyup', e => keys[e.code] = false);
-
-        function resetGame() {
-            player.x = 100; player.y = 300;
-            player.vx = 0; player.vy = 0;
-            player.shootCooldown = 0;
-            cameraX = 0;
-            gameActive = true;
-            overlay.style.display = 'none';
-            initWorld();
-        }
-
-        function update() {
-            if (!gameActive) return;
-            const moveLeft = keys['ArrowLeft'] || keys['KeyA'];
-            const moveRight = keys['ArrowRight'] || keys['KeyD'];
-
-            if (moveLeft) { player.vx -= ACCEL; player.facingRight = false; }
-            else if (moveRight) { player.vx += ACCEL; player.facingRight = true; }
-            else { player.vx *= (player.onGround ? FRICTION : AIR_RES); }
-
-            player.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.vx));
-            player.vy += GRAVITY;
-            player.x += player.vx;
-            handleCollision(true);
-            player.y += player.vy;
-            player.onGround = false;
-            handleCollision(false);
-
-            if (player.onGround) player.coyoteTime = 8;
-            else player.coyoteTime--;
-
-            if ((keys['ArrowUp'] || keys['KeyW'] || keys['Space']) && player.coyoteTime > 0) {
-                player.vy = JUMP_FORCE;
-                player.coyoteTime = 0;
-                player.onGround = false;
+        // --- GAME LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!gameActive) {
+                renderer.render(scene, camera);
+                return;
             }
 
-            if (player.shootCooldown > 0) player.shootCooldown--;
+            const delta = clock.getDelta();
 
-            projectiles.forEach(p => {
-                if (!p.active) return;
-                p.x += p.vx;
-                if (p.x < cameraX || p.x > cameraX + canvas.width) p.active = false;
-                const tx = Math.floor(p.x / TILE_SIZE);
-                const ty = Math.floor(p.y / TILE_SIZE);
-                if (world[ty] && world[ty][tx] > 0 && world[ty][tx] !== 4) p.active = false;
-                enemies.forEach(en => {
-                    if (!en.dead && checkOverlap(p, en)) {
-                        en.dead = true; p.active = false;
-                        playNote(110, audioCtx?.currentTime || 0, 0.1, 'sawtooth', 0.1);
+            // Player Movement
+            if (keys['KeyA'] || keys['ArrowLeft']) player.position.x -= PLAYER_SPEED;
+            if (keys['KeyD'] || keys['ArrowRight']) player.position.x += PLAYER_SPEED;
+            
+            player.userData.vy += GRAVITY;
+            player.position.y += player.userData.vy;
+
+            // Simple Collision
+            player.userData.onGround = false;
+            platforms.forEach(p => {
+                const pBox = new THREE.Box3().setFromObject(p);
+                const playerBox = new THREE.Box3().setFromCenterAndSize(player.position, new THREE.Vector3(1, 1, 1));
+                
+                if (pBox.intersectsBox(playerBox) && player.userData.vy <= 0) {
+                    player.position.y = pBox.max.y + 0.5;
+                    player.userData.vy = 0;
+                    player.userData.onGround = true;
+                }
+            });
+
+            if ((keys['Space'] || keys['KeyW']) && player.userData.onGround) {
+                player.userData.vy = JUMP_FORCE;
+            }
+
+            // Enemies
+            enemies.forEach(en => {
+                en.position.x += en.userData.speed;
+                if(Math.abs(en.position.x - en.userData.startX) > en.userData.range) en.userData.speed *= -1;
+                
+                if(player.position.distanceTo(en.position) < 1) {
+                    gameOver();
+                }
+            });
+
+            // Projectiles
+            projectiles.forEach((p, idx) => {
+                p.position.x += p.userData.vx;
+                enemies.forEach((en, eIdx) => {
+                    if(p.position.distanceTo(en.position) < 1) {
+                        scene.remove(en);
+                        enemies.splice(eIdx, 1);
+                        scene.remove(p);
+                        projectiles.splice(idx, 1);
                     }
                 });
-                if (boss && boss.invuln === 0 && checkOverlap(p, boss)) {
-                    boss.hp--; boss.invuln = 15; p.active = false;
-                    hpFill.style.width = (boss.hp / boss.maxHp * 100) + '%';
-                    if (boss.hp <= 0) victory();
-                    playNote(220, audioCtx?.currentTime || 0, 0.05, 'square', 0.1);
-                }
-            });
-            projectiles = projectiles.filter(p => p.active);
-
-            enemies.forEach(en => {
-                if (en.dead) return;
-                en.x += en.vx;
-                const col = Math.floor((en.vx > 0 ? en.x + en.width : en.x) / TILE_SIZE);
-                const row = Math.floor((en.y + en.height / 2) / TILE_SIZE);
-                if (world[row] && world[row][col] > 0) en.vx *= -1;
-                if (checkOverlap(player, en)) {
-                    if (player.vy > 0 && player.y + player.height < en.y + 15) {
-                        en.dead = true; player.vy = -10;
-                    } else gameOver();
+                if(p.position.x > player.position.x + 20) {
+                    scene.remove(p);
+                    projectiles.splice(idx, 1);
                 }
             });
 
-            if (boss) {
-                if (boss.invuln > 0) boss.invuln--;
-                boss.x += boss.vx;
-                boss.vy += 0.2;
-                boss.y += boss.vy;
-                if (boss.x > player.x + 50) boss.vx = -2.5;
-                else if (boss.x < player.x - 50) boss.vx = 2.5;
-                if (boss.y + boss.height > (ROWS - 1) * TILE_SIZE) {
-                    boss.y = (ROWS - 1) * TILE_SIZE - boss.height;
-                    boss.vy = -Math.random() * 5; 
-                }
-                if (checkOverlap(player, boss)) {
-                    if (player.vy > 0 && player.y + player.height < boss.y + 30 && boss.invuln === 0) {
-                        boss.hp--; boss.invuln = 60; player.vy = -12;
-                        hpFill.style.width = (boss.hp / boss.maxHp * 100) + '%';
-                        if (boss.hp <= 0) victory();
-                    } else if (boss.invuln === 0) gameOver();
-                }
-            }
+            // Camera follow
+            camera.position.x += (player.position.x - camera.position.x) * 0.1;
+            
+            // Death plane
+            if(player.position.y < -5) gameOver();
 
-            let targetCam = player.x - canvas.width / 2;
-            cameraX += (targetCam - cameraX) * 0.1;
-            cameraX = Math.max(0, Math.min(cameraX, COLS * TILE_SIZE - canvas.width));
-            if (player.y > canvas.height) gameOver();
+            renderer.render(scene, camera);
         }
 
-        function checkOverlap(a, b) {
-            return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+        function startGame() {
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('game-ui').classList.remove('hidden');
+            gameActive = true;
         }
 
         function gameOver() {
             gameActive = false;
-            overlay.style.display = 'flex';
-            document.getElementById('overlay-title').innerText = "GAME OVER";
-            document.getElementById('overlay-title').className = "text-6xl font-black mb-8 tracking-tighter italic text-red-500";
+            showMessage("GAME OVER - RELOADING...");
+            setTimeout(() => location.reload(), 2000);
         }
 
-        function handleCollision(isX) {
-            const x1 = Math.floor((isX ? player.x : player.x + COLLISION_MARGIN) / TILE_SIZE);
-            const x2 = Math.floor((isX ? player.x + player.width : player.x + player.width - COLLISION_MARGIN) / TILE_SIZE);
-            const y1 = Math.floor((isX ? player.y + COLLISION_MARGIN : player.y) / TILE_SIZE);
-            const y2 = Math.floor((isX ? player.y + player.height - COLLISION_MARGIN : player.y + player.height) / TILE_SIZE);
-            for (let r = y1; r <= y2; r++) {
-                for (let c = x1; c <= x2; c++) {
-                    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
-                    if (world[r][c] > 0) {
-                        if (world[r][c] === 4) { nextLevel(); return; }
-                        if (isX) {
-                            if (player.vx > 0) player.x = c * TILE_SIZE - player.width;
-                            else if (player.vx < 0) player.x = (c + 1) * TILE_SIZE;
-                            player.vx = 0;
-                        } else {
-                            if (player.vy > 0) {
-                                player.y = r * TILE_SIZE - player.height;
-                                player.onGround = true; player.vy = 0;
-                            } else if (player.vy < 0) {
-                                player.y = (r + 1) * TILE_SIZE; player.vy = 0;
-                            }
-                        }
-                    }
-                }
-            }
+        function showMessage(txt) {
+            const box = document.getElementById('message-box');
+            box.innerText = txt;
+            box.style.display = 'block';
+            setTimeout(() => box.style.display = 'none', 2000);
         }
 
-        function safeDrawImage(img, ...args) {
-            if (img && img.complete && img.naturalWidth !== 0) ctx.drawImage(img, ...args);
-            else {
-                const [x, y, w, h] = args.length === 4 ? args : [args[0], args[1], TILE_SIZE, TILE_SIZE];
-                ctx.fillStyle = '#ff00ff'; ctx.fillRect(x, y, w || TILE_SIZE, h || TILE_SIZE);
-            }
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.save(); ctx.translate(-Math.floor(cameraX), 0);
-            for (let r = 0; r < ROWS; r++) {
-                for (let c = Math.floor(cameraX/TILE_SIZE); c < Math.floor((cameraX+canvas.width)/TILE_SIZE)+1; c++) {
-                    if (c >= COLS) break;
-                    const tile = world[r][c];
-                    if (tile === 1) safeDrawImage(images.brick, c*TILE_SIZE, r*TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                    else if (tile === 2) safeDrawImage(images.grass, c*TILE_SIZE, r*TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                    else if (tile === 3) safeDrawImage(images.coin, c*TILE_SIZE, r*TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                    else if (tile === 4) {
-                        ctx.fillStyle = '#37474F'; ctx.fillRect(c*TILE_SIZE + 18, r*TILE_SIZE, 4, TILE_SIZE);
-                        ctx.fillStyle = '#D32F2F'; ctx.fillRect(c*TILE_SIZE + 22, r*TILE_SIZE + 4, 15, 12);
-                    }
-                }
-            }
-            enemies.forEach(en => { if (!en.dead) safeDrawImage(images.enemy, en.x, en.y, en.width, en.height); });
-            ctx.fillStyle = '#FFFF00';
-            projectiles.forEach(p => { ctx.fillRect(p.x, p.y, p.width, p.height); });
-            if (boss && boss.invuln % 10 < 5) safeDrawImage(images.boss, boss.x, boss.y, boss.width, boss.height);
-            if (!player.facingRight) {
-                ctx.save(); ctx.translate(player.x + player.width, player.y); ctx.scale(-1, 1);
-                safeDrawImage(images.player, 0, 0, player.width, player.height); ctx.restore();
-            } else safeDrawImage(images.player, player.x, player.y, player.width, player.height);
-            ctx.restore();
-            update();
-            requestAnimationFrame(draw);
-        }
-
-        function resize() {
-            const ratio = canvas.width / canvas.height;
-            let w = window.innerWidth, h = w / ratio;
-            if (h > window.innerHeight) { h = window.innerHeight; w = h * ratio; }
-            canvas.style.width = Math.floor(w) + 'px'; canvas.style.height = Math.floor(h) + 'px';
-        }
-        window.addEventListener('resize', resize);
-        window.onload = () => { loadImages(); initWorld(); resize(); draw(); };
+        window.onload = init;
     </script>
 </body>
 </html>
