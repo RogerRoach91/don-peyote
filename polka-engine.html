@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Sprite Engine - WebGL</title>
+    <title>2D Sprite Open World</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -23,7 +23,7 @@
         }
 
         #menu-screen {
-            background-image: url('https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-start-screen.png');
+            background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-start-screen.png');
             background-size: cover;
             background-position: center;
             z-index: 300;
@@ -33,7 +33,7 @@
         }
 
         .menu-card {
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.7);
             padding: 1rem 2rem;
             border-radius: 50px;
             backdrop-filter: blur(12px);
@@ -41,7 +41,6 @@
             flex-direction: row;
             gap: 2rem;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            text-align: center;
         }
 
         .menu-btn {
@@ -51,33 +50,12 @@
             color: white;
             font-size: 1.5rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             cursor: pointer;
-            pointer-events: auto;
-            white-space: nowrap;
+            transition: transform 0.2s;
             text-shadow: 2px 2px 0px #000;
         }
 
-        .menu-btn:hover {
-            transform: scale(1.2) rotate(-2deg);
-            color: #22d3ee;
-            text-shadow: 4px 4px 0px rgba(34, 211, 238, 0.3);
-            background: transparent;
-        }
-
-        #intro-overlay {
-            background: black;
-            z-index: 200;
-            display: none;
-            pointer-events: auto;
-        }
-        
-        #intro-video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+        .menu-btn:hover { transform: scale(1.1); color: #22d3ee; }
 
         #game-ui {
             position: absolute;
@@ -86,325 +64,357 @@
             color: white;
             pointer-events: none;
             text-shadow: 2px 2px 0 #000;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
         }
 
-        #message-box {
+        #shop-ui {
             position: fixed;
-            bottom: 30px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 4px solid #facc15;
+            padding: 2rem;
+            border-radius: 20px;
+            color: white;
+            display: none;
+            z-index: 500;
+            pointer-events: auto;
+            min-width: 300px;
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #333;
+        }
+
+        .buy-btn {
+            background: #16a34a;
+            padding: 5px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .buy-btn:hover { background: #22c55e; }
+
+        #interaction-prompt {
+            position: fixed;
+            bottom: 100px;
             left: 50%;
             transform: translateX(-50%);
-            background: #facc15;
-            padding: 10px 20px;
-            border-radius: 10px;
-            font-size: 1.2rem;
+            background: white;
+            color: black;
+            padding: 5px 15px;
+            border-radius: 20px;
             display: none;
+            animation: bounce 1s infinite;
         }
+
+        @keyframes bounce { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -10px); } }
     </style>
 </head>
 <body>
 
     <div id="menu-screen" class="full-overlay">
         <div class="menu-card">
-            <button onclick="onNewGame()" class="menu-btn">New Game</button>
-            <button onclick="showMessage('Save disabled in Demo')" class="menu-btn">Load Game</button>
-            <button onclick="showMessage('Graphics: Ultra')" class="menu-btn">Options</button>
+            <button onclick="startGame()" class="menu-btn">Enter World</button>
         </div>
     </div>
 
-    <div id="intro-overlay" class="full-overlay">
-        <video id="intro-video" preload="auto">
-            <source src="https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-start-screen-grok.mp4" type="video/mp4">
-        </video>
-    </div>
-
     <div id="game-ui" class="hidden">
-        <div id="level-name" class="text-3xl text-cyan-400">Level 1: WebGL 2D Sprite World</div>
-        <div class="text-sm opacity-80">WASD to Move | Space to Jump | Click to Shoot</div>
+        <div id="zone-display" class="text-3xl text-cyan-400">The Wilds</div>
+        <div id="stats" class="text-xl">Gold: <span id="gold-val">0</span> | Potions: <span id="pot-val">0</span></div>
+        <div class="text-sm opacity-80">WASD: Move | Space: Jump | E: Interact</div>
     </div>
 
-    <div id="message-box"></div>
+    <div id="shop-ui">
+        <h2 class="text-2xl text-yellow-400 mb-4 text-center">Town Shop</h2>
+        <div class="shop-item">
+            <span>Health Potion</span>
+            <button class="buy-btn" onclick="buyItem('potion', 10)">10 Gold</button>
+        </div>
+        <div class="shop-item">
+            <span>Speed Boots</span>
+            <button class="buy-btn" onclick="buyItem('boots', 50)">50 Gold</button>
+        </div>
+        <button class="mt-4 w-full text-red-400" onclick="closeShop()">Close</button>
+    </div>
+
+    <div id="interaction-prompt">Press 'E' to Talk</div>
 
     <script>
-        // --- CONFIG & STATE ---
+        // --- STATE ---
         let scene, camera, renderer, clock;
-        let player, enemies = [], platforms = [], projectiles = [];
+        let player, enemies = [], platforms = [], npcs = [], projectiles = [];
         let keys = {};
         let gameActive = false;
-        let worldWidth = 500;
+        let stats = { gold: 0, potions: 0, speedMult: 1 };
         
         const textureLoader = new THREE.TextureLoader();
-        
-        // Helper to create a solid color texture as a fallback
-        function createSolidTexture(color) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 16;
-            canvas.height = 16;
-            const context = canvas.getContext('2d');
-            context.fillStyle = color;
-            context.fillRect(0, 0, 16, 16);
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.magFilter = THREE.NearestFilter;
-            return texture;
-        }
+        const worldSize = 2000;
+        const townCenter = 300; // Town is located at X = 300
+        const townRadius = 50;
 
-        // Safe texture loader with fallback
-        function loadSafeTexture(url, fallbackColor, onComplete) {
-            return textureLoader.load(
-                url, 
-                (tex) => {
-                    tex.magFilter = THREE.NearestFilter;
-                    if (onComplete) onComplete(tex);
-                },
-                undefined,
-                (err) => {
-                    console.warn(`Failed to load ${url}, using fallback color ${fallbackColor}`);
-                    const tex = createSolidTexture(fallbackColor);
-                    if (onComplete) onComplete(tex);
-                }
-            );
-        }
-
+        // Assets (PokeAPI fallbacks used for sprites)
         const SPRITES = {
             player: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/25.png',
             enemy: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/129.png',
-            grass: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/1.png', 
-            brick: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/11.png', 
-            bullet: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/items/poke-ball.png'
+            npc: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/151.png',
+            shopkeeper: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/122.png',
+            grass: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/1.png',
+            brick: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/11.png',
+            coin: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/items/nugget.png'
         };
 
-        const PLAYER_SPEED = 0.15;
-        const JUMP_FORCE = 0.32;
         const GRAVITY = -0.015;
+        const JUMP_FORCE = 0.32;
 
-        // --- INITIALIZATION ---
+        function createSolidTexture(color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 16; canvas.height = 16;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = color; ctx.fillRect(0,0,16,16);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.magFilter = THREE.NearestFilter;
+            return tex;
+        }
+
+        function loadSafe(url, color) {
+            return textureLoader.load(url, (t) => t.magFilter = THREE.NearestFilter, undefined, () => createSolidTexture(color));
+        }
+
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x87CEEB);
 
             const aspect = window.innerWidth / window.innerHeight;
-            const viewSize = 8;
-            camera = new THREE.OrthographicCamera(
-                -viewSize * aspect, viewSize * aspect,
-                viewSize, -viewSize,
-                0.1, 1000
-            );
+            camera = new THREE.OrthographicCamera(-8*aspect, 8*aspect, 8, -8, 0.1, 1000);
             camera.position.set(0, 5, 10);
-            camera.lookAt(0, 5, 0);
 
             renderer = new THREE.WebGLRenderer({ antialias: false });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            const ambient = new THREE.AmbientLight(0xffffff, 1.2);
-            scene.add(ambient);
-
+            scene.add(new THREE.AmbientLight(0xffffff, 1.2));
             clock = new THREE.Clock();
 
-            createLevel();
+            buildWorld();
             createPlayer();
-            
-            window.addEventListener('resize', onWindowResize);
-            window.addEventListener('keydown', e => keys[e.code] = true);
+
+            window.addEventListener('keydown', e => { 
+                keys[e.code] = true;
+                if(e.code === 'KeyE') handleInteraction();
+            });
             window.addEventListener('keyup', e => keys[e.code] = false);
             window.addEventListener('mousedown', shoot);
+            window.addEventListener('resize', onResize);
 
             animate();
         }
 
         function createPlayer() {
-            const texture = loadSafeTexture(SPRITES.player, '#ffff00');
-            const material = new THREE.SpriteMaterial({ map: texture });
-            player = new THREE.Sprite(material);
+            player = new THREE.Sprite(new THREE.SpriteMaterial({ map: loadSafe(SPRITES.player, '#ffff00') }));
             player.scale.set(1.5, 1.5, 1);
-            player.position.set(0, 6, 2); 
-            player.userData = { vy: 0, onGround: false, radius: 0.6 };
+            player.position.set(0, 5, 2);
+            player.userData = { vy: 0, onGround: false };
             scene.add(player);
         }
 
-        function createLevel() {
-            // Main Floor
-            const grassTex = loadSafeTexture(SPRITES.grass, '#2d5a27');
-            const grassMat = new THREE.SpriteMaterial({ map: grassTex });
+        function buildWorld() {
+            const grassMat = new THREE.SpriteMaterial({ map: loadSafe(SPRITES.grass, '#2d5a27') });
+            const brickMat = new THREE.SpriteMaterial({ map: loadSafe(SPRITES.brick, '#8b4513') });
 
-            const floorY = 0;
-            const tileSize = 2;
-            for(let x = -worldWidth/4; x < worldWidth/4; x++) {
+            // Generate Floor
+            for(let x = -50; x < 500; x += 2) {
                 const tile = new THREE.Sprite(grassMat);
-                tile.scale.set(tileSize, tileSize, 1);
-                tile.position.set(x * tileSize, floorY, 1);
+                tile.scale.set(2, 2, 1);
+                tile.position.set(x, 0, 1);
                 scene.add(tile);
-                
-                if (x === -worldWidth/4) {
-                    platforms.push({
-                        pos: { x: 0, y: floorY },
-                        width: worldWidth,
-                        height: tileSize
-                    });
-                }
             }
+            platforms.push({ x: 225, y: 0, w: 1100, h: 2 });
 
-            // Floating Platforms
-            const brickTex = loadSafeTexture(SPRITES.brick, '#8b4513');
-            const brickMat = new THREE.SpriteMaterial({ map: brickTex });
+            // Town Setup (X=300)
+            const shopkeeper = new THREE.Sprite(new THREE.SpriteMaterial({ map: loadSafe(SPRITES.shopkeeper, '#ff00ff') }));
+            shopkeeper.position.set(townCenter, 2, 1.5);
+            shopkeeper.scale.set(1.6, 1.6, 1);
+            shopkeeper.userData = { type: 'shop', name: 'Merchant' };
+            scene.add(shopkeeper);
+            npcs.push(shopkeeper);
 
-            for(let i=0; i < 100; i++) {
-                const x = (Math.random() * worldWidth/2) - (worldWidth/4);
-                if (Math.abs(x) < 4) continue; 
-                
-                const y = Math.random() * 8 + 3;
-                const pWidth = 3;
-                
-                const plat = new THREE.Sprite(brickMat);
-                plat.scale.set(pWidth, 0.8, 1);
-                plat.position.set(x, y, 1);
-                scene.add(plat);
-                
-                platforms.push({
-                    pos: { x: x, y: y },
-                    width: pWidth,
-                    height: 0.8
-                });
+            const villager = new THREE.Sprite(new THREE.SpriteMaterial({ map: loadSafe(SPRITES.npc, '#ffffff') }));
+            villager.position.set(townCenter - 15, 2, 1.5);
+            villager.scale.set(1.5, 1.5, 1);
+            villager.userData = { type: 'npc', name: 'Mayor', msg: 'Welcome to SpriteVille! Avoid the Magikarps East of here.' };
+            scene.add(villager);
+            npcs.push(villager);
 
-                if(Math.random() > 0.7) spawnEnemy(x, y + 1.1);
+            // Platforms & Enemies
+            for(let i=0; i<150; i++) {
+                const x = (Math.random() * 1000) - 100;
+                // Don't spawn dangers in town
+                if(Math.abs(x - townCenter) < townRadius) continue;
+
+                const y = 3 + Math.random() * 7;
+                const p = new THREE.Sprite(brickMat);
+                p.scale.set(3, 0.8, 1);
+                p.position.set(x, y, 1);
+                scene.add(p);
+                platforms.push({ x: x, y: y, w: 3, h: 0.8 });
+
+                if(Math.random() > 0.6) spawnEnemy(x, y + 1.1);
             }
         }
 
         function spawnEnemy(x, y) {
-            const texture = loadSafeTexture(SPRITES.enemy, '#ff4444');
-            const material = new THREE.SpriteMaterial({ map: texture });
-            const enemy = new THREE.Sprite(material);
+            const enemy = new THREE.Sprite(new THREE.SpriteMaterial({ map: loadSafe(SPRITES.enemy, '#ff0000') }));
             enemy.position.set(x, y, 2);
             enemy.scale.set(1.2, 1.2, 1);
-            enemy.userData = { speed: 0.04 + Math.random() * 0.03, range: 4, startX: x };
-            scene.add(enemy);
+            enemy.userData = { startX: x, range: 4, dir: 1 };
             enemies.push(enemy);
+            scene.add(enemy);
         }
 
-        function shoot() {
-            if(!gameActive) return;
-            const texture = loadSafeTexture(SPRITES.bullet, '#ffffff');
-            const mat = new THREE.SpriteMaterial({ map: texture });
-            const bullet = new THREE.Sprite(mat);
-            bullet.position.copy(player.position);
-            bullet.scale.set(0.6, 0.6, 1);
-            bullet.userData = { vx: player.scale.x > 0 ? 0.4 : -0.4 }; 
-            scene.add(bullet);
-            projectiles.push(bullet);
+        function handleInteraction() {
+            npcs.forEach(npc => {
+                if(player.position.distanceTo(npc.position) < 2.5) {
+                    if(npc.userData.type === 'shop') {
+                        document.getElementById('shop-ui').style.display = 'block';
+                    } else {
+                        showMessage(npc.userData.msg);
+                    }
+                }
+            });
+        }
+
+        function buyItem(id, price) {
+            if(stats.gold >= price) {
+                stats.gold -= price;
+                if(id === 'potion') stats.potions++;
+                if(id === 'boots') {
+                    stats.speedMult = 1.5;
+                    showMessage("Speed Increased!");
+                }
+                updateUI();
+            } else {
+                showMessage("Not enough gold!");
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('gold-val').innerText = stats.gold;
+            document.getElementById('pot-val').innerText = stats.potions;
+            
+            const dist = Math.abs(player.position.x - townCenter);
+            document.getElementById('zone-display').innerText = dist < townRadius ? "SpriteVille" : "The Wilds";
         }
 
         function animate() {
             requestAnimationFrame(animate);
-            if (!gameActive) {
-                renderer.render(scene, camera);
-                return;
-            }
+            if(!gameActive) return;
 
-            if (keys['KeyA'] || keys['ArrowLeft']) {
-                player.position.x -= PLAYER_SPEED;
-                player.scale.x = -1.5;
-            }
-            if (keys['KeyD'] || keys['ArrowRight']) {
-                player.position.x += PLAYER_SPEED;
-                player.scale.x = 1.5;
-            }
-            
+            // Movement
+            const speed = 0.15 * stats.speedMult;
+            if(keys['KeyA'] || keys['ArrowLeft']) { player.position.x -= speed; player.scale.x = -1.5; }
+            if(keys['KeyD'] || keys['ArrowRight']) { player.position.x += speed; player.scale.x = 1.5; }
+
             player.userData.vy += GRAVITY;
             player.position.y += player.userData.vy;
 
+            // Collision
             player.userData.onGround = false;
-            const pX = player.position.x;
-            const pY = player.position.y;
-            const pRadius = 0.75; 
-
             platforms.forEach(p => {
-                const halfW = p.width / 2;
-                const halfH = p.height / 2;
-                const left = p.pos.x - halfW;
-                const right = p.pos.x + halfW;
-                const top = p.pos.y + halfH;
-
-                if (pX > left - 0.4 && pX < right + 0.4) {
-                    if (pY - pRadius <= top && pY > p.pos.y && player.userData.vy <= 0) {
-                        player.position.y = top + pRadius;
+                if(Math.abs(player.position.x - p.x) < (p.w/2 + 0.4)) {
+                    const top = p.y + p.h/2;
+                    if(player.position.y - 0.75 <= top && player.position.y > p.y && player.userData.vy <= 0) {
+                        player.position.y = top + 0.75;
                         player.userData.vy = 0;
                         player.userData.onGround = true;
                     }
                 }
             });
 
-            if ((keys['Space'] || keys['KeyW'] || keys['ArrowUp']) && player.userData.onGround) {
-                player.userData.vy = JUMP_FORCE;
-            }
+            if(keys['Space'] && player.userData.onGround) player.userData.vy = JUMP_FORCE;
 
+            // Camera & UI
+            camera.position.x += (player.position.x - camera.position.x) * 0.1;
+            updateUI();
+
+            // Interaction Check
+            let near = false;
+            npcs.forEach(npc => { if(player.position.distanceTo(npc.position) < 2.5) near = true; });
+            document.getElementById('interaction-prompt').style.display = near ? 'block' : 'none';
+
+            // Enemies
             enemies.forEach(en => {
-                en.position.x += en.userData.speed;
-                if(Math.abs(en.position.x - en.userData.startX) > en.userData.range) en.userData.speed *= -1;
-                if(player.position.distanceTo(en.position) < 0.9) gameOver();
-            });
-
-            projectiles.forEach((p, idx) => {
-                p.position.x += p.userData.vx;
-                enemies.forEach((en, eIdx) => {
-                    if(p.position.distanceTo(en.position) < 0.9) {
-                        scene.remove(en);
-                        enemies.splice(eIdx, 1);
-                        scene.remove(p);
-                        projectiles.splice(idx, 1);
+                en.position.x += 0.04 * en.userData.dir;
+                if(Math.abs(en.position.x - en.userData.startX) > en.userData.range) en.userData.dir *= -1;
+                if(player.position.distanceTo(en.position) < 0.9) {
+                    if(stats.potions > 0) {
+                        stats.potions--;
+                        player.position.y += 2; // Bounce back
+                        showMessage("Used Potion!");
+                    } else {
+                        gameOver();
                     }
-                });
-                if(Math.abs(p.position.x - player.position.x) > 20) {
-                    scene.remove(p);
-                    projectiles.splice(idx, 1);
                 }
             });
 
-            camera.position.x += (player.position.x - camera.position.x) * 0.1;
-            if(player.position.y < -10) gameOver();
+            // Projectiles
+            projectiles.forEach((p, i) => {
+                p.position.x += p.userData.vx;
+                enemies.forEach((en, ei) => {
+                    if(p.position.distanceTo(en.position) < 1) {
+                        scene.remove(en); enemies.splice(ei, 1);
+                        scene.remove(p); projectiles.splice(i, 1);
+                        stats.gold += 5;
+                    }
+                });
+            });
 
+            if(player.position.y < -10) gameOver();
             renderer.render(scene, camera);
         }
 
-        function onNewGame() {
-            document.getElementById('menu-screen').style.display = 'none';
-            const introOverlay = document.getElementById('intro-overlay');
-            const introVideo = document.getElementById('intro-video');
-            introOverlay.style.display = 'flex';
-            introVideo.play().catch(e => { closeIntro(); });
-            introVideo.onended = () => { closeIntro(); };
-        }
-
-        function closeIntro() {
-            const introVideo = document.getElementById('intro-video');
-            introVideo.pause();
-            document.getElementById('intro-overlay').style.display = 'none';
-            startGame();
+        function shoot() {
+            if(!gameActive || document.getElementById('shop-ui').style.display === 'block') return;
+            const bullet = new THREE.Sprite(new THREE.SpriteMaterial({ map: loadSafe(SPRITES.bullet, '#fff') }));
+            bullet.position.copy(player.position);
+            bullet.scale.set(0.6, 0.6, 1);
+            bullet.userData = { vx: player.scale.x > 0 ? 0.4 : -0.4 };
+            projectiles.push(bullet);
+            scene.add(bullet);
         }
 
         function startGame() {
+            document.getElementById('menu-screen').style.display = 'none';
             document.getElementById('game-ui').classList.remove('hidden');
             gameActive = true;
         }
 
+        function closeShop() { document.getElementById('shop-ui').style.display = 'none'; }
+
         function gameOver() {
             gameActive = false;
-            showMessage("GAME OVER - RELOADING...");
-            setTimeout(() => location.reload(), 2000);
+            alert("Captured by Magikarp! Gold lost: " + stats.gold);
+            location.reload();
         }
 
-        function showMessage(txt) {
-            const box = document.getElementById('message-box');
-            box.innerText = txt;
-            box.style.display = 'block';
-            setTimeout(() => box.style.display = 'none', 2000);
+        function showMessage(msg) {
+            const b = document.createElement('div');
+            b.style = "position:fixed; bottom:200px; left:50%; transform:translateX(-50%); background:yellow; padding:10px; border-radius:10px; z-index:1000;";
+            b.innerText = msg;
+            document.body.appendChild(b);
+            setTimeout(() => b.remove(), 3000);
         }
 
-        function onWindowResize() {
+        function onResize() {
             const aspect = window.innerWidth / window.innerHeight;
-            const viewSize = 8;
-            camera.left = -viewSize * aspect;
-            camera.right = viewSize * aspect;
-            camera.top = viewSize;
-            camera.bottom = -viewSize;
+            camera.left = -8*aspect; camera.right = 8*aspect;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
