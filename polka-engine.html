@@ -169,6 +169,7 @@
         <div class="options-panel">
             <h2 class="text-4xl text-cyan-400 text-center mb-4">Settings</h2>
             <button onclick="toggleMusic()" id="music-btn" class="menu-btn bg-cyan-900/50 rounded-lg">Music: ON</button>
+            <button onclick="toggleSfx()" id="sfx-btn" class="menu-btn bg-cyan-900/50 rounded-lg">Sounds: ON</button>
             <div class="text-white text-center text-xl opacity-60">Graphics: Ultra</div>
             <button onclick="closeOptions()" class="mt-4 p-2 bg-red-600 text-white rounded-lg">Back to Menu</button>
         </div>
@@ -211,7 +212,7 @@
         }
 
         function playSound(freq, type, duration, vol) {
-            if (!audioCtx || !musicEnabled) return;
+            if (!audioCtx || !sfxEnabled) return;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = type;
@@ -237,6 +238,7 @@
         let keys = {};
         let gameActive = false;
         let musicEnabled = true;
+        let sfxEnabled = true;
         let stats = { gold: 0, potions: 0, speedMult: 1 };
         
         const textureLoader = new THREE.TextureLoader();
@@ -521,6 +523,12 @@
             } else {
                 music.pause();
             }
+        }
+
+        function toggleSfx() {
+            sfxEnabled = !sfxEnabled;
+            const btn = document.getElementById('sfx-btn');
+            btn.innerText = sfxEnabled ? "Sounds: ON" : "Sounds: OFF";
         }
 
         function onNewGame() {
