@@ -176,6 +176,36 @@
     <div id="interaction-prompt">Press 'E' to Talk</div>
 
     <script>
+        // --- AUDIO ENGINE ---
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(freq, type, duration, vol) {
+            if (!audioCtx || !musicEnabled) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        // Specific SFX
+        const sfx = {
+            jump: () => playSound(400, 'square', 0.1, 0.1),
+            shoot: () => playSound(150, 'sawtooth', 0.1, 0.05),
+            collect: () => playSound(800, 'sine', 0.2, 0.1),
+            damage: () => playSound(100, 'triangle', 0.3, 0.2)
+        };
+
         // --- STATE ---
         let scene, camera, renderer, clock;
         let player, enemies = [], platforms = [], npcs = [], projectiles = [];
@@ -189,7 +219,6 @@
         const townCenter = 300; 
         const townRadius = 50;
         
-        // Cache to store globally accessible fallback-ready materials
         let MATERIALS = {}; 
 
         const SPRITES = {
@@ -215,7 +244,6 @@
             return tex;
         }
 
-        // New highly robust material factory: Applies solid color instantly to prevent invisiblility
         function createSafeMaterial(url, fallbackColor) {
             const mat = new THREE.SpriteMaterial({ map: createSolidTexture(fallbackColor) });
             textureLoader.load(
@@ -248,7 +276,6 @@
             scene.add(new THREE.AmbientLight(0xffffff, 1.2));
             clock = new THREE.Clock();
 
-            // Pre-compile our resilient materials
             MATERIALS = {
                 player: createSafeMaterial(SPRITES.player, '#ffff00'),
                 enemy: createSafeMaterial(SPRITES.enemy, '#ff0000'),
@@ -265,7 +292,6 @@
             window.addEventListener('keydown', e => { 
                 keys[e.code] = true;
                 if(e.code === 'KeyE') handleInteraction();
-                // Check for shoot keys (Enter or J)
                 if(e.code === 'Enter' || e.code === 'KeyJ') shoot();
             });
             window.addEventListener('keyup', e => keys[e.code] = false);
@@ -283,7 +309,6 @@
         }
 
         function buildWorld() {
-            // Generate Floor
             for(let x = -50; x < 500; x += 2) {
                 const tile = new THREE.Sprite(MATERIALS.grass);
                 tile.scale.set(2, 2, 1);
@@ -292,7 +317,6 @@
             }
             platforms.push({ x: 225, y: 0, w: 1100, h: 2 });
 
-            // Town Setup (X=300)
             const shopkeeper = new THREE.Sprite(MATERIALS.shopkeeper);
             shopkeeper.position.set(townCenter, 2, 1.5);
             shopkeeper.scale.set(1.6, 1.6, 1);
@@ -307,19 +331,15 @@
             scene.add(villager);
             npcs.push(villager);
 
-            // Platforms & Enemies
             for(let i=0; i<150; i++) {
                 const x = (Math.random() * 1000) - 100;
-                // Don't spawn dangers in town
                 if(Math.abs(x - townCenter) < townRadius) continue;
-
                 const y = 3 + Math.random() * 7;
                 const p = new THREE.Sprite(MATERIALS.brick);
                 p.scale.set(3, 0.8, 1);
                 p.position.set(x, y, 1);
                 scene.add(p);
                 platforms.push({ x: x, y: y, w: 3, h: 0.8 });
-
                 if(Math.random() > 0.6) spawnEnemy(x, y + 1.1);
             }
         }
@@ -348,6 +368,7 @@
         function buyItem(id, price) {
             if(stats.gold >= price) {
                 stats.gold -= price;
+                sfx.collect();
                 if(id === 'potion') stats.potions++;
                 if(id === 'boots') {
                     stats.speedMult = 1.5;
@@ -362,7 +383,6 @@
         function updateUI() {
             document.getElementById('gold-val').innerText = stats.gold;
             document.getElementById('pot-val').innerText = stats.potions;
-            
             const dist = Math.abs(player.position.x - townCenter);
             document.getElementById('zone-display').innerText = dist < townRadius ? "SpriteVille" : "The Wilds";
         }
@@ -371,7 +391,6 @@
             requestAnimationFrame(animate);
             if(!gameActive) return;
 
-            // Movement
             const speed = 0.15 * stats.speedMult;
             if(keys['KeyA'] || keys['ArrowLeft']) { player.position.x -= speed; player.scale.x = -1.5; }
             if(keys['KeyD'] || keys['ArrowRight']) { player.position.x += speed; player.scale.x = 1.5; }
@@ -379,7 +398,6 @@
             player.userData.vy += GRAVITY;
             player.position.y += player.userData.vy;
 
-            // Collision
             player.userData.onGround = false;
             platforms.forEach(p => {
                 if(Math.abs(player.position.x - p.x) < (p.w/2 + 0.4)) {
@@ -392,25 +410,26 @@
                 }
             });
 
-            if(keys['Space'] && player.userData.onGround) player.userData.vy = JUMP_FORCE;
+            if(keys['Space'] && player.userData.onGround) {
+                player.userData.vy = JUMP_FORCE;
+                sfx.jump();
+            }
 
-            // Camera & UI
             camera.position.x += (player.position.x - camera.position.x) * 0.1;
             updateUI();
 
-            // Interaction Check
             let near = false;
             npcs.forEach(npc => { if(player.position.distanceTo(npc.position) < 2.5) near = true; });
             document.getElementById('interaction-prompt').style.display = near ? 'block' : 'none';
 
-            // Enemies
             enemies.forEach(en => {
                 en.position.x += 0.04 * en.userData.dir;
                 if(Math.abs(en.position.x - en.userData.startX) > en.userData.range) en.userData.dir *= -1;
                 if(player.position.distanceTo(en.position) < 0.9) {
                     if(stats.potions > 0) {
                         stats.potions--;
-                        player.position.y += 2; // Bounce back
+                        player.position.y += 2;
+                        sfx.damage();
                         showMessage("Used Potion!");
                     } else {
                         gameOver();
@@ -418,12 +437,10 @@
                 }
             });
 
-            // Projectiles logic
             for (let i = projectiles.length - 1; i >= 0; i--) {
                 let p = projectiles[i];
                 p.position.x += p.userData.vx;
                 let hit = false;
-                
                 for (let ei = enemies.length - 1; ei >= 0; ei--) {
                     let en = enemies[ei];
                     if (p.position.distanceTo(en.position) < 1) {
@@ -432,11 +449,11 @@
                         scene.remove(p); 
                         projectiles.splice(i, 1);
                         stats.gold += 5;
+                        sfx.collect();
                         hit = true;
                         break;
                     }
                 }
-                
                 if (!hit && Math.abs(p.position.x - player.position.x) > 15) {
                     scene.remove(p);
                     projectiles.splice(i, 1);
@@ -449,7 +466,7 @@
 
         function shoot() {
             if(!gameActive || document.getElementById('shop-ui').style.display === 'block') return;
-
+            sfx.shoot();
             const bullet = new THREE.Sprite(MATERIALS.bullet);
             bullet.position.copy(player.position);
             bullet.scale.set(0.6, 0.6, 1);
@@ -472,6 +489,7 @@
         }
 
         function onNewGame() {
+            initAudio(); // Initialize Web Audio on user gesture
             document.getElementById('menu-screen').style.display = 'none';
             const introOverlay = document.getElementById('intro-overlay');
             const introVideo = document.getElementById('intro-video');
@@ -492,7 +510,6 @@
             document.getElementById('menu-screen').style.display = 'none';
             document.getElementById('game-ui').classList.remove('hidden');
             
-            // Play background music if enabled
             const music = document.getElementById('bg-music');
             if (music && musicEnabled) {
                 music.volume = 0.4;
@@ -506,6 +523,7 @@
 
         function gameOver() {
             gameActive = false;
+            sfx.damage();
             const music = document.getElementById('bg-music');
             if (music) music.pause();
             
