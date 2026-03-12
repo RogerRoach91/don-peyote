@@ -142,6 +142,7 @@
     <div id="menu-screen" class="full-overlay">
         <div class="menu-card">
             <button onclick="onNewGame()" class="menu-btn">New Game</button>
+            <button onclick="toggleMusic()" id="music-btn" class="menu-btn">Music: ON</button>
             <button onclick="showMessage('Save disabled in Demo')" class="menu-btn">Load Game</button>
             <button onclick="showMessage('Graphics: Ultra')" class="menu-btn">Options</button>
         </div>
@@ -180,6 +181,7 @@
         let player, enemies = [], platforms = [], npcs = [], projectiles = [];
         let keys = {};
         let gameActive = false;
+        let musicEnabled = true;
         let stats = { gold: 0, potions: 0, speedMult: 1 };
         
         const textureLoader = new THREE.TextureLoader();
@@ -267,7 +269,6 @@
                 if(e.code === 'Enter' || e.code === 'KeyJ') shoot();
             });
             window.addEventListener('keyup', e => keys[e.code] = false);
-            // Removed mousedown listener for shooting
             window.addEventListener('resize', onResize);
 
             animate();
@@ -417,7 +418,7 @@
                 }
             });
 
-            // Projectiles logic fixed to safely iterate backward while deleting array elements
+            // Projectiles logic
             for (let i = projectiles.length - 1; i >= 0; i--) {
                 let p = projectiles[i];
                 p.position.x += p.userData.vx;
@@ -436,7 +437,6 @@
                     }
                 }
                 
-                // Cleanup out-of-bounds bullets to prevent memory leak
                 if (!hit && Math.abs(p.position.x - player.position.x) > 15) {
                     scene.remove(p);
                     projectiles.splice(i, 1);
@@ -448,7 +448,6 @@
         }
 
         function shoot() {
-            // Prevent shooting if UI overlays are open or game not active
             if(!gameActive || document.getElementById('shop-ui').style.display === 'block') return;
 
             const bullet = new THREE.Sprite(MATERIALS.bullet);
@@ -459,13 +458,25 @@
             scene.add(bullet);
         }
 
+        function toggleMusic() {
+            musicEnabled = !musicEnabled;
+            const btn = document.getElementById('music-btn');
+            btn.innerText = musicEnabled ? "Music: ON" : "Music: OFF";
+            
+            const music = document.getElementById('bg-music');
+            if (musicEnabled) {
+                if (gameActive) music.play().catch(e => console.warn(e));
+            } else {
+                music.pause();
+            }
+        }
+
         function onNewGame() {
             document.getElementById('menu-screen').style.display = 'none';
             const introOverlay = document.getElementById('intro-overlay');
             const introVideo = document.getElementById('intro-video');
             introOverlay.style.display = 'flex';
             
-            // Try playing the video. If the link is dead, skip directly to game.
             introVideo.play().catch(e => { closeIntro(); });
             introVideo.onended = () => { closeIntro(); };
         }
@@ -481,14 +492,13 @@
             document.getElementById('menu-screen').style.display = 'none';
             document.getElementById('game-ui').classList.remove('hidden');
             
-            // Play background music
+            // Play background music if enabled
             const music = document.getElementById('bg-music');
-            if (music) {
+            if (music && musicEnabled) {
                 music.volume = 0.4;
-                music.play().catch(e => console.warn("Music auto-play blocked or failed"));
+                music.play().catch(e => console.warn("Music play blocked"));
             }
 
-            // Adding a tiny delay to activate game logic
             setTimeout(() => { gameActive = true; }, 100);
         }
 
@@ -496,7 +506,6 @@
 
         function gameOver() {
             gameActive = false;
-            // Stop music on game over
             const music = document.getElementById('bg-music');
             if (music) music.pause();
             
