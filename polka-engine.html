@@ -371,7 +371,8 @@
             
             // The Pub
             const pubBuilding = new THREE.Sprite(MATERIALS.pub);
-            pubBuilding.position.set(townCenter - 25, 4.5, 0.5);
+            // Height is 10, so center it at Y=6 (10/2 + ground at 1) to make the bottom sit at Y=1
+            pubBuilding.position.set(townCenter - 25, 6, 0.5);
             pubBuilding.scale.set(12, 10, 1);
             scene.add(pubBuilding);
 
