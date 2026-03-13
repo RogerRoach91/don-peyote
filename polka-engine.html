@@ -371,9 +371,7 @@
             
             // The Pub
             const pubBuilding = new THREE.Sprite(MATERIALS.pub);
-            // To account for invisible padding at the bottom of the PNG, 
-            // we lower the Y coordinate further. Previously at 6.1 (mathematical bottom), 
-            // lowering it to 5.5 (or lower if needed) to bury the "padding" beneath the ground line.
+            // Adjusted Y to 5.5 to lift slightly while burying padding.
             pubBuilding.position.set(townCenter - 25, 5.5, 0.5);
             pubBuilding.scale.set(12, 10, 1);
             scene.add(pubBuilding);
