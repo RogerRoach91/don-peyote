@@ -243,7 +243,7 @@
         
         const textureLoader = new THREE.TextureLoader();
         const worldSize = 2000;
-        const townCenter = 0; // Moved Town to origin (0,0) for spawn
+        const townCenter = 0; 
         const townRadius = 50;
         
         let MATERIALS = {}; 
@@ -255,7 +255,9 @@
             shopkeeper: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/122.png',
             grass: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/1.png',
             brick: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/11.png',
-            bullet: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/items/poke-ball.png'
+            bullet: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/items/poke-ball.png',
+            pub: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/pub850x700.png',
+            barkeeper: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/113.png'
         };
 
         const GRAVITY = -0.015;
@@ -310,7 +312,9 @@
                 shopkeeper: createSafeMaterial(SPRITES.shopkeeper, '#ff00ff'),
                 grass: createSafeMaterial(SPRITES.grass, '#2d5a27'),
                 brick: createSafeMaterial(SPRITES.brick, '#8b4513'),
-                bullet: createSafeMaterial(SPRITES.bullet, '#ffffff')
+                bullet: createSafeMaterial(SPRITES.bullet, '#ffffff'),
+                pub: createSafeMaterial(SPRITES.pub, '#444444'),
+                barkeeper: createSafeMaterial(SPRITES.barkeeper, '#ffaaaa')
             };
 
             buildWorld();
@@ -330,16 +334,13 @@
         function createPlayer() {
             player = new THREE.Sprite(MATERIALS.player);
             player.scale.set(1.5, 1.5, 1);
-            // Spawn in town center
             player.position.set(townCenter, 5, 2);
             player.userData = { vy: 0, onGround: false };
             scene.add(player);
-            // Focus camera immediately
             camera.position.x = townCenter;
         }
 
         function buildWorld() {
-            // Expanded floor
             for(let x = -200; x < 800; x += 2) {
                 const tile = new THREE.Sprite(MATERIALS.grass);
                 tile.scale.set(2, 2, 1);
@@ -348,13 +349,31 @@
             }
             platforms.push({ x: 300, y: 0, w: 1000, h: 2 });
 
+            // --- VILLAGE BUILDINGS ---
+            
+            // The Pub
+            const pubBuilding = new THREE.Sprite(MATERIALS.pub);
+            pubBuilding.position.set(townCenter - 25, 4.5, 0.5);
+            pubBuilding.scale.set(12, 10, 1);
+            scene.add(pubBuilding);
+
+            // Barkeeper in front of Pub
+            const barkeeper = new THREE.Sprite(MATERIALS.barkeeper);
+            barkeeper.position.set(townCenter - 25, 2.2, 1.5);
+            barkeeper.scale.set(1.6, 1.6, 1);
+            barkeeper.userData = { type: 'npc', name: 'Barkeeper', msg: 'Welcome to the Sprite Lounge. Rest your weary legs, stranger.' };
+            scene.add(barkeeper);
+            npcs.push(barkeeper);
+
+            // Merchant
             const shopkeeper = new THREE.Sprite(MATERIALS.shopkeeper);
-            shopkeeper.position.set(townCenter + 5, 2, 1.5); // Placed near spawn
+            shopkeeper.position.set(townCenter + 5, 2, 1.5); 
             shopkeeper.scale.set(1.6, 1.6, 1);
             shopkeeper.userData = { type: 'shop', name: 'Merchant' };
             scene.add(shopkeeper);
             npcs.push(shopkeeper);
 
+            // Mayor
             const villager = new THREE.Sprite(MATERIALS.npc);
             villager.position.set(townCenter - 8, 2, 1.5);
             villager.scale.set(1.5, 1.5, 1);
@@ -362,11 +381,9 @@
             scene.add(villager);
             npcs.push(villager);
 
-            // Platform generation around the town
             for(let i=0; i<150; i++) {
                 const x = (Math.random() * 1000) - 200;
-                // Keep the core town area clear of random platforms and enemies
-                if(Math.abs(x - townCenter) < 20) continue;
+                if(Math.abs(x - townCenter) < 40) continue; // Keep town area clear
                 
                 const y = 3 + Math.random() * 7;
                 const p = new THREE.Sprite(MATERIALS.brick);
@@ -509,7 +526,6 @@
             scene.add(bullet);
         }
 
-        // --- OPTION LOGIC ---
         function openOptions() {
             initAudio();
             document.getElementById('options-overlay').style.display = 'flex';
@@ -583,7 +599,7 @@
 
         function showMessage(msg) {
             const b = document.createElement('div');
-            b.style = "position:fixed; bottom:200px; left:50%; transform:translateX(-50%); background:yellow; padding:10px; border-radius:10px; z-index:1000;";
+            b.style = "position:fixed; bottom:200px; left:50%; transform:translateX(-50%); background:yellow; padding:10px; border-radius:10px; z-index:1000; font-family: 'Luckiest Guy', cursive;";
             b.innerText = msg;
             document.body.appendChild(b);
             setTimeout(() => b.remove(), 3000);
