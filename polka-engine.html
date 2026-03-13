@@ -182,7 +182,7 @@
     </div>
 
     <div id="game-ui" class="hidden">
-        <div id="zone-display" class="text-3xl text-cyan-400">The Wilds</div>
+        <div id="zone-display" class="text-3xl text-cyan-400">SpriteVille</div>
         <div id="stats" class="text-xl">Gold: <span id="gold-val">0</span> | Potions: <span id="pot-val">0</span></div>
         <div class="text-sm opacity-80">WASD: Move | Space: Jump | Enter / J: Shoot | E: Interact</div>
     </div>
@@ -243,7 +243,7 @@
         
         const textureLoader = new THREE.TextureLoader();
         const worldSize = 2000;
-        const townCenter = 300; 
+        const townCenter = 0; // Moved Town to origin (0,0) for spawn
         const townRadius = 50;
         
         let MATERIALS = {}; 
@@ -330,37 +330,44 @@
         function createPlayer() {
             player = new THREE.Sprite(MATERIALS.player);
             player.scale.set(1.5, 1.5, 1);
-            player.position.set(0, 5, 2);
+            // Spawn in town center
+            player.position.set(townCenter, 5, 2);
             player.userData = { vy: 0, onGround: false };
             scene.add(player);
+            // Focus camera immediately
+            camera.position.x = townCenter;
         }
 
         function buildWorld() {
-            for(let x = -50; x < 500; x += 2) {
+            // Expanded floor
+            for(let x = -200; x < 800; x += 2) {
                 const tile = new THREE.Sprite(MATERIALS.grass);
                 tile.scale.set(2, 2, 1);
                 tile.position.set(x, 0, 1);
                 scene.add(tile);
             }
-            platforms.push({ x: 225, y: 0, w: 1100, h: 2 });
+            platforms.push({ x: 300, y: 0, w: 1000, h: 2 });
 
             const shopkeeper = new THREE.Sprite(MATERIALS.shopkeeper);
-            shopkeeper.position.set(townCenter, 2, 1.5);
+            shopkeeper.position.set(townCenter + 5, 2, 1.5); // Placed near spawn
             shopkeeper.scale.set(1.6, 1.6, 1);
             shopkeeper.userData = { type: 'shop', name: 'Merchant' };
             scene.add(shopkeeper);
             npcs.push(shopkeeper);
 
             const villager = new THREE.Sprite(MATERIALS.npc);
-            villager.position.set(townCenter - 15, 2, 1.5);
+            villager.position.set(townCenter - 8, 2, 1.5);
             villager.scale.set(1.5, 1.5, 1);
             villager.userData = { type: 'npc', name: 'Mayor', msg: 'Welcome to SpriteVille! Avoid the Magikarps East of here.' };
             scene.add(villager);
             npcs.push(villager);
 
+            // Platform generation around the town
             for(let i=0; i<150; i++) {
-                const x = (Math.random() * 1000) - 100;
-                if(Math.abs(x - townCenter) < townRadius) continue;
+                const x = (Math.random() * 1000) - 200;
+                // Keep the core town area clear of random platforms and enemies
+                if(Math.abs(x - townCenter) < 20) continue;
+                
                 const y = 3 + Math.random() * 7;
                 const p = new THREE.Sprite(MATERIALS.brick);
                 p.scale.set(3, 0.8, 1);
