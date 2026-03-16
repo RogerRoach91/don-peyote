@@ -147,6 +147,26 @@
         }
 
         @keyframes bounce { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -10px); } }
+
+        /* Custom styling for volume slider */
+        .volume-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 10px;
+            background: #334155;
+            outline: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #22d3ee;
+            border-radius: 50%;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body onclick="tryStartMenuMusic()">
@@ -170,6 +190,15 @@
         <div class="options-panel">
             <h2 class="text-4xl text-cyan-400 text-center mb-4">Settings</h2>
             <button onclick="toggleMusic()" id="music-btn" class="menu-btn bg-cyan-900/50 rounded-lg">Music: ON</button>
+            
+            <div class="flex flex-col gap-2 mt-2">
+                <label class="text-white text-lg flex justify-between">
+                    <span>Music Volume</span>
+                    <span id="vol-label">40%</span>
+                </label>
+                <input type="range" min="0" max="100" value="40" class="volume-slider" id="music-vol" oninput="updateVolume(this.value)">
+            </div>
+
             <button onclick="toggleSfx()" id="sfx-btn" class="menu-btn bg-cyan-900/50 rounded-lg">Sounds: ON</button>
             <div class="text-white text-center text-xl opacity-60">Graphics: Ultra</div>
             <button onclick="closeOptions()" class="mt-4 p-2 bg-red-600 text-white rounded-lg">Close</button>
@@ -208,6 +237,7 @@
         let audioCtx;
         let menuMusicStarted = false;
         let gameMusicStarted = false;
+        let globalMusicVol = 0.4;
 
         function initAudio() {
             if (!audioCtx) {
@@ -215,11 +245,22 @@
             }
         }
 
+        function updateVolume(val) {
+            globalMusicVol = val / 100;
+            document.getElementById('vol-label').innerText = val + "%";
+            
+            const menuMusic = document.getElementById('menu-music');
+            const gameMusic = document.getElementById('game-music');
+            
+            menuMusic.volume = globalMusicVol;
+            gameMusic.volume = globalMusicVol;
+        }
+
         function tryStartMenuMusic() {
             initAudio();
             if (musicEnabled && !menuMusicStarted && !gameActive) {
                 const menuMusic = document.getElementById('menu-music');
-                menuMusic.volume = 0.4;
+                menuMusic.volume = globalMusicVol;
                 menuMusic.play().then(() => {
                     menuMusicStarted = true;
                 }).catch(e => console.log("Waiting for user interaction for menu music."));
@@ -234,7 +275,7 @@
             menuMusicStarted = false;
 
             if (musicEnabled) {
-                gameMusic.volume = 0.4;
+                gameMusic.volume = globalMusicVol;
                 gameMusic.play().then(() => {
                     gameMusicStarted = true;
                 }).catch(e => console.log("Music play blocked."));
@@ -398,9 +439,7 @@
             platforms.push({ x: 300, y: 0, w: 1000, h: 2 });
 
             const pubBuilding = new THREE.Sprite(MATERIALS.pub);
-            // Height set to 3.4 as requested
             pubBuilding.position.set(townCenter - 25, 3.4, 0.5); 
-            // Scale remains 25% smaller as established previously
             pubBuilding.scale.set(5.06, 4.21, 1);
             scene.add(pubBuilding);
 
