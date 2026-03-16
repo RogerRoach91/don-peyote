@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Sprite Open World - Pub Interior</title>
+    <title>2D Sprite Open World - Castle Background</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -238,7 +238,7 @@
 
         // --- GAME ENGINE ---
         let scene, camera, renderer, clock;
-        let player, interactSprite, enemies = [], platforms = [], npcs = [], projectiles = [];
+        let player, interactSprite, bgPlanes = [], enemies = [], platforms = [], npcs = [], projectiles = [];
         let keys = {};
         let gameActive = false, isPaused = false, wireframeMode = false;
         let isInside = false; 
@@ -264,7 +264,8 @@
             pub: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/pub850x700.png',
             pubOpen: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/pub-door-open-850x700.png',
             barkeeper: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/113.png',
-            woodFloor: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/items/wood-mail.png'
+            woodFloor: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/items/wood-mail.png',
+            background: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/castle-background.png'
         };
 
         const GRAVITY = -0.015, JUMP_FORCE = 0.32;
@@ -281,9 +282,7 @@
             ctx.fillStyle = '#facc15';
             ctx.strokeStyle = '#000';
             ctx.lineWidth = 4;
-            // Draw circle background
             ctx.beginPath(); ctx.arc(32, 32, 28, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-            // Draw "!"
             ctx.fillStyle = '#000';
             ctx.fillRect(28, 12, 8, 24);
             ctx.fillRect(28, 42, 8, 8);
@@ -302,7 +301,7 @@
 
         function init() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB);
+            scene.background = new THREE.Color(0x221133);
             const aspect = window.innerWidth / window.innerHeight;
             camera = new THREE.OrthographicCamera(-VIEW_SIZE * aspect, VIEW_SIZE * aspect, VIEW_SIZE, -VIEW_SIZE, 0.1, 1000);
             camera.position.set(0, 5, 10);
@@ -335,6 +334,7 @@
             scene.add(worldGroup);
             scene.add(interiorGroup);
 
+            buildBackground();
             buildWorld();
             buildInterior();
             createPlayer();
@@ -351,6 +351,25 @@
             animate();
         }
 
+        function buildBackground() {
+            textureLoader.load(SPRITES.background, (tex) => {
+                tex.magFilter = THREE.LinearFilter;
+                const aspect = 16/9; // Assume wide background
+                const h = 14;
+                const w = h * aspect;
+                
+                // Create multiple planes for infinite tiling
+                for (let i = -5; i <= 15; i++) {
+                    const bgMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+                    const bgGeom = new THREE.PlaneGeometry(w, h);
+                    const bg = new THREE.Mesh(bgGeom, bgMat);
+                    bg.position.set(i * w, 5, -1);
+                    worldGroup.add(bg);
+                    bgPlanes.push(bg);
+                }
+            });
+        }
+
         function createPlayer() {
             player = new THREE.Sprite(MATERIALS.playerStand);
             player.scale.set(2.2, 2.2, 1);
@@ -358,7 +377,6 @@
             player.userData = { vy: 0, onGround: false, facingRight: true, currentAnim: 'stand', animFrame: 0, animTimer: 0, isRespawning: false, helper: createBoxHelper(player, 0x22d3ee) };
             scene.add(player);
 
-            // Create Interaction Indicator (!)
             interactSprite = new THREE.Sprite(MATERIALS.exclamation);
             interactSprite.scale.set(0.6, 0.6, 1);
             interactSprite.visible = false;
@@ -465,7 +483,7 @@
                 isInside = entering;
                 worldGroup.visible = !entering;
                 interiorGroup.visible = entering;
-                scene.background = new THREE.Color(entering ? 0x221100 : 0x87CEEB);
+                scene.background = new THREE.Color(entering ? 0x221100 : 0x221133);
                 
                 if (entering) {
                     player.position.set(-6, 2, 2);
@@ -494,7 +512,7 @@
                 isInside = false;
                 worldGroup.visible = true;
                 interiorGroup.visible = false;
-                scene.background = new THREE.Color(0x87CEEB);
+                scene.background = new THREE.Color(0x221133);
                 
                 player.position.set(townCenter, 5, 2);
                 player.userData.vy = 0;
@@ -529,7 +547,16 @@
                 if (player.material.map) player.material.map.offset.x = player.userData.animFrame / 11;
             }
 
-            // --- INTERACTION LOGIC ---
+            // --- PARALLAX BACKGROUND ---
+            if (!isInside) {
+                bgPlanes.forEach(bg => {
+                    // Parallax factor: move background at 20% of the player's world speed
+                    bg.position.x = bg.userData.initialX || bg.position.x;
+                    if (!bg.userData.initialX) bg.userData.initialX = bg.position.x;
+                    bg.position.x = bg.userData.initialX + (camera.position.x * 0.8);
+                });
+            }
+
             let foundInteraction = false;
             if (!isInside && pubBuilding) {
                 const doorPosX = pubBuilding.position.x - 1.2;
@@ -548,7 +575,6 @@
                 });
             }
 
-            // Update ! Indicator
             if (foundInteraction) {
                 interactSprite.visible = true;
                 interactSprite.position.set(player.position.x, player.position.y + 1.6 + Math.sin(Date.now() * 0.01) * 0.1, 3);
