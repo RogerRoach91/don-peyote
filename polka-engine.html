@@ -126,6 +126,16 @@
             display: none;
             z-index: 200;
         }
+        
+        #loading-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            z-index: 400;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body onclick="tryStartMenuMusic()">
@@ -138,6 +148,8 @@
     </audio>
 
     <div id="transition-overlay"></div>
+
+    <div id="loading-bar">Initializing Assets...</div>
 
     <div id="menu-screen" class="full-overlay">
         <div class="menu-card">
@@ -202,7 +214,16 @@
         let currentZone = 'town'; // 'town' or 'pub'
         let stats = { gold: 100, beers: 0 };
         const VIEW_SIZE = 4.5;
-        const textureLoader = new THREE.TextureLoader();
+
+        // Better Texture Handling
+        const loadingManager = new THREE.LoadingManager();
+        loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+            document.getElementById('loading-bar').innerText = `Loading Assets: ${Math.round(itemsLoaded / itemsTotal * 100)}%`;
+        };
+        loadingManager.onLoad = () => {
+            document.getElementById('loading-bar').style.display = 'none';
+        };
+        const textureLoader = new THREE.TextureLoader(loadingManager);
 
         let MATERIALS = {};
         let pubBuilding = null;
@@ -214,14 +235,28 @@
             pub: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/pub850x700.png',
             pubOpen: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/pub-door-open-850x700.png',
             barkeeper: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/other/official-artwork/113.png',
-            pubBg: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-start-screen.png' // Mock interior
+            grass: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/1.png'
         };
 
-        function createMat(url, tx=1, ty=1) {
-            const m = new THREE.SpriteMaterial({ map: textureLoader.load(url, t => {
-                t.magFilter = THREE.NearestFilter;
-                t.repeat.set(1/tx, 1/ty);
-            })});
+        function createMat(url, tx=1, ty=1, fallbackColor = 0xffffff) {
+            const texture = textureLoader.load(url, 
+                (t) => {
+                    t.magFilter = THREE.NearestFilter;
+                    t.minFilter = THREE.NearestFilter;
+                    t.repeat.set(1/tx, 1/ty);
+                    t.needsUpdate = true;
+                },
+                undefined,
+                (err) => {
+                    console.error("Failed to load texture:", url);
+                }
+            );
+            
+            const m = new THREE.SpriteMaterial({ 
+                map: texture, 
+                color: fallbackColor,
+                transparent: true 
+            });
             return m;
         }
 
@@ -230,19 +265,21 @@
             scene.background = new THREE.Color(0x87CEEB);
             const aspect = window.innerWidth / window.innerHeight;
             camera = new THREE.OrthographicCamera(-VIEW_SIZE * aspect, VIEW_SIZE * aspect, VIEW_SIZE, -VIEW_SIZE, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: false }); // Disable antialias for pixel art look
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(renderer.domElement);
             clock = new THREE.Clock();
 
+            // Setup Materials with Fallbacks
             MATERIALS = {
-                stand: createMat(SPRITES.stand, 2, 1),
-                runR: createMat(SPRITES.runR, 11, 1),
-                runL: createMat(SPRITES.runL, 11, 1),
-                pub: createMat(SPRITES.pub),
-                pubOpen: createMat(SPRITES.pubOpen),
-                barkeeper: createMat(SPRITES.barkeeper),
-                grass: createMat('https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/1.png')
+                stand: createMat(SPRITES.stand, 2, 1, 0xffffff),
+                runR: createMat(SPRITES.runR, 11, 1, 0xffffff),
+                runL: createMat(SPRITES.runL, 11, 1, 0xffffff),
+                pub: createMat(SPRITES.pub, 1, 1, 0x8b4513),
+                pubOpen: createMat(SPRITES.pubOpen, 1, 1, 0xa0522d),
+                barkeeper: createMat(SPRITES.barkeeper, 1, 1, 0xff00ff),
+                grass: createMat(SPRITES.grass, 1, 1, 0x228b22)
             };
 
             loadTown();
@@ -253,7 +290,20 @@
                 if(e.code === 'KeyE') handleInteraction();
             };
             window.onkeyup = e => keys[e.code] = false;
+            
+            window.addEventListener('resize', onWindowResize, false);
+            
             animate();
+        }
+
+        function onWindowResize() {
+            const aspect = window.innerWidth / window.innerHeight;
+            camera.left = -VIEW_SIZE * aspect;
+            camera.right = VIEW_SIZE * aspect;
+            camera.top = VIEW_SIZE;
+            camera.bottom = -VIEW_SIZE;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
         function createPlayer() {
@@ -309,7 +359,7 @@
             scene.add(bk);
 
             // Exit Marker
-            const exit = new THREE.Sprite(createMat(SPRITES.pubOpen));
+            const exit = new THREE.Sprite(MATERIALS.pubOpen);
             exit.scale.set(3, 3.5, 1);
             exit.position.set(-7, 2.7, 0.1);
             exit.userData = { type: 'exit' };
@@ -320,7 +370,7 @@
         }
 
         function addPlatform(x, y, w, h) {
-            const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({color: 0x443322, visible: false}));
+            const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({color: 0x443322, visible: true}));
             p.position.set(x, y, 0);
             platforms.push(p);
             scene.add(p);
@@ -443,16 +493,16 @@
             player.material = MATERIALS[anim === 'stand' ? 'stand' : anim];
             if(anim !== 'stand') {
                 if(++player.userData.animTimer > 6) { player.userData.animFrame = (player.userData.animFrame + 1) % 11; player.userData.animTimer = 0; }
-                player.material.map.offset.x = player.userData.animFrame / 11;
+                if(player.material.map) player.material.map.offset.x = player.userData.animFrame / 11;
             } else {
-                player.material.map.offset.x = player.userData.facingR ? 0.5 : 0;
+                if(player.material.map) player.material.map.offset.x = player.userData.facingR ? 0.5 : 0;
             }
 
             // Physics
             player.userData.vy -= 0.015;
             player.position.y += player.userData.vy;
             platforms.forEach(p => {
-                if(Math.abs(player.position.x - p.position.x) < 10) { // Simple floor check
+                if(Math.abs(player.position.x - p.position.x) < 10) { 
                     if(player.position.y < 2.1 && player.userData.vy <= 0) {
                         player.position.y = 2.1;
                         player.userData.vy = 0;
@@ -463,7 +513,7 @@
 
             // Interaction Prompt
             let near = false;
-            if(currentZone === 'town' && Math.abs(player.position.x - (pubBuilding.position.x - 1.2)) < 1.5) near = true;
+            if(currentZone === 'town' && pubBuilding && Math.abs(player.position.x - (pubBuilding.position.x - 1.2)) < 1.5) near = true;
             npcs.forEach(n => { if(player.position.distanceTo(n.position) < 2.5) near = true; });
             document.getElementById('interaction-prompt').style.display = near ? 'block' : 'none';
 
