@@ -222,10 +222,11 @@
     <script>
         // --- GLOBALS ---
         let scene, camera, renderer, clock;
-        let player, enemies = [], platforms = [], projectiles = [];
+        let player, enemies = [], platforms = [], projectiles = [], npcs = [];
         let keys = {};
         let gameActive = false, isPaused = false;
         let audioCtx, globalMusicVol = 0.4, musicEnabled = true, sfxEnabled = true;
+        let lastFacingRight = true;
         
         // Debug Engine State
         let debug = {
@@ -304,6 +305,10 @@
             MATERIALS.brick = new THREE.SpriteMaterial({ map: textureLoader.load(SPRITES.brick) });
             MATERIALS.bullet = new THREE.SpriteMaterial({ map: textureLoader.load(SPRITES.bullet) });
 
+            // Setup Player Sprite Animation (2 columns, 1 row)
+            MATERIALS.player.map.repeat.set(1/2, 1);
+            MATERIALS.player.map.offset.set(0, 0);
+
             buildWorld();
             createPlayer();
 
@@ -341,13 +346,30 @@
         }
 
         function buildWorld() {
+            // Build Town Area (Left Side)
+            addPlatform(-15, 0, 30, 1); // Town Floor
+            addPlatform(-20, 3, 4, 6);  // Town House 1
+            addPlatform(-10, 3, 5, 4);  // Town House 2
+            spawnNPC(-16, 1.5);
+            spawnNPC(-8, 1.5);
+
+            // Build Wild Area (Right Side)
             for(let i=0; i<20; i++) {
-                addPlatform(i*6 - 20, 0, 5, 1);
+                addPlatform(i*6 + 10, 0, 5, 1);
             }
             for(let i=0; i<8; i++) {
-                addPlatform(i*10, 4, 3, 0.5);
-                if(i > 0) spawnEnemy(i*10, 5.5);
+                addPlatform(i*10 + 15, 4, 3, 0.5);
+                if(i > 0) spawnEnemy(i*10 + 15, 5.5);
             }
+        }
+
+        function spawnNPC(x, y) {
+            const npc = new THREE.Sprite(MATERIALS.enemy.clone());
+            npc.material.color.setHex(0xaaffaa); // Tint green to distinguish from enemies
+            npc.position.set(x, y, 2);
+            npc.scale.set(1.5, 1.5, 1);
+            scene.add(npc);
+            npcs.push(npc);
         }
 
         function addPlatform(x, y, w, h) {
@@ -398,12 +420,32 @@
                 return;
             }
 
+            // Zone UI Update based on X position
+            const zoneEl = document.getElementById('zone-display');
+            if (player.position.x < 5) {
+                if (zoneEl.innerText !== "SpriteVille Town") zoneEl.innerText = "SpriteVille Town";
+            } else {
+                if (zoneEl.innerText !== "The Wilds") zoneEl.innerText = "The Wilds";
+            }
+
             // Movement Logic
             let speed = debug.noclip ? 0.25 : 0.12;
             player.userData.vx = 0;
-            if(keys['KeyA']) player.userData.vx = -speed;
-            if(keys['KeyD']) player.userData.vx = speed;
+            let isMoving = false;
             
+            if(keys['KeyA']) { player.userData.vx = -speed; lastFacingRight = false; isMoving = true; }
+            if(keys['KeyD']) { player.userData.vx = speed; lastFacingRight = true; isMoving = true; }
+
+            // Handle Player Animations & Flipping
+            const frameIndex = isMoving ? (Math.floor(debug.frames / 10) % 2) : 0;
+            if(lastFacingRight) {
+                MATERIALS.player.map.repeat.set(1/2, 1);
+                MATERIALS.player.map.offset.x = frameIndex * 0.5;
+            } else {
+                MATERIALS.player.map.repeat.set(-1/2, 1);
+                MATERIALS.player.map.offset.x = (frameIndex * 0.5) + 0.5;
+            }
+
             if(debug.noclip) {
                 if(keys['KeyW']) player.position.y += speed;
                 if(keys['KeyS']) player.position.y -= speed;
@@ -436,6 +478,35 @@
                 e.position.x += 0.03 * e.userData.dir;
                 if(Math.abs(e.position.x - e.userData.startX) > 4) e.userData.dir *= -1;
             });
+
+            // Projectiles Logic
+            for(let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+                p.position.x += p.userData.vx;
+                
+                // Check enemy collision
+                let hit = false;
+                for(let j = enemies.length - 1; j >= 0; j--) {
+                    let e = enemies[j];
+                    if(Math.abs(p.position.x - e.position.x) < 1.2 && Math.abs(p.position.y - e.position.y) < 1.2) {
+                        scene.remove(e.userData.helper);
+                        scene.remove(e);
+                        enemies.splice(j, 1);
+                        hit = true;
+                        
+                        // Increase Gold UI
+                        let goldEl = document.getElementById('gold-val');
+                        goldEl.innerText = parseInt(goldEl.innerText) + 10;
+                        break;
+                    }
+                }
+
+                // Remove projectile if it hits something or goes out of bounds
+                if(hit || Math.abs(p.position.x - player.position.x) > 15) {
+                    scene.remove(p);
+                    projectiles.splice(i, 1);
+                }
+            }
 
             // Update Debug Visuals
             if(debug.wireframe) {
@@ -493,7 +564,16 @@
         function updateVolume(v) { globalMusicVol = v/100; }
         function toggleMusic() { musicEnabled = !musicEnabled; document.getElementById('music-btn').innerText = `Music: ${musicEnabled?'ON':'OFF'}`; }
         function toggleSFX() { sfxEnabled = !sfxEnabled; document.getElementById('sfx-btn').innerText = `Sound FX: ${sfxEnabled?'ON':'OFF'}`; }
-        function shoot() { /* Logic for projectile spawning */ }
+        
+        function shoot() {
+            if(!gameActive || isPaused) return;
+            const bullet = new THREE.Sprite(MATERIALS.bullet);
+            bullet.position.set(player.position.x, player.position.y, 2);
+            bullet.scale.set(0.5, 0.5, 1);
+            bullet.userData = { vx: lastFacingRight ? 0.4 : -0.4 };
+            scene.add(bullet);
+            projectiles.push(bullet);
+        }
 
         window.onload = init;
     </script>
