@@ -84,8 +84,7 @@
             pointer-events: none;
             text-shadow: 2px 2px 0 #000;
             display: flex;
-            flex-direction: column;
-            gap: 5px;
+            flex-direction: column; gap: 5px;
         }
 
         #shop-ui {
@@ -150,11 +149,13 @@
         @keyframes bounce { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -10px); } }
     </style>
 </head>
-<body onclick="tryStartMusic()">
+<body onclick="tryStartMenuMusic()">
 
-    <!-- Background Music -->
-    <audio id="bg-music" loop>
+    <audio id="menu-music" loop>
         <source src="https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-theme.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="game-music" loop>
+        <source src="https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/Whispers_of_the_Verdant_Keep.mp3" type="audio/mpeg">
     </audio>
 
     <div id="menu-screen" class="full-overlay">
@@ -205,7 +206,8 @@
     <script>
         // --- AUDIO-ENGINE ---
         let audioCtx;
-        let musicStarted = false;
+        let menuMusicStarted = false;
+        let gameMusicStarted = false;
 
         function initAudio() {
             if (!audioCtx) {
@@ -213,14 +215,29 @@
             }
         }
 
-        function tryStartMusic() {
+        function tryStartMenuMusic() {
             initAudio();
-            if (musicEnabled && !musicStarted) {
-                const music = document.getElementById('bg-music');
-                music.volume = 0.4;
-                music.play().then(() => {
-                    musicStarted = true;
-                }).catch(e => console.log("Autoplay prevented; waiting for user interaction."));
+            if (musicEnabled && !menuMusicStarted && !gameActive) {
+                const menuMusic = document.getElementById('menu-music');
+                menuMusic.volume = 0.4;
+                menuMusic.play().then(() => {
+                    menuMusicStarted = true;
+                }).catch(e => console.log("Waiting for user interaction for menu music."));
+            }
+        }
+
+        function switchMusicToGame() {
+            const menuMusic = document.getElementById('menu-music');
+            const gameMusic = document.getElementById('game-music');
+            
+            menuMusic.pause();
+            menuMusicStarted = false;
+
+            if (musicEnabled) {
+                gameMusic.volume = 0.4;
+                gameMusic.play().then(() => {
+                    gameMusicStarted = true;
+                }).catch(e => console.log("Music play blocked."));
             }
         }
 
@@ -255,11 +272,9 @@
         let sfxEnabled = true;
         let stats = { gold: 0, potions: 0, speedMult: 1 };
         
-        // --- CAMERA CONFIG ---
-        const VIEW_SIZE = 5; 
+        const VIEW_SIZE = 4.2; 
 
         const textureLoader = new THREE.TextureLoader();
-        const worldSize = 2000;
         const townCenter = 0; 
         const townRadius = 50;
         
@@ -349,7 +364,7 @@
                 if(e.code === 'KeyE') handleInteraction();
                 if(e.code === 'Enter' || e.code === 'KeyJ') shoot();
                 if(e.code === 'Escape') toggleOptionsFromKey();
-                tryStartMusic();
+                tryStartMenuMusic();
             });
             window.addEventListener('keyup', e => keys[e.code] = false);
             window.addEventListener('resize', onResize);
@@ -382,23 +397,21 @@
             }
             platforms.push({ x: 300, y: 0, w: 1000, h: 2 });
 
-            // --- VILLAGE BUILDINGS ---
-            
-            // The Pub - Scaled down 25% (12 -> 9, 10 -> 7.5)
             const pubBuilding = new THREE.Sprite(MATERIALS.pub);
-            pubBuilding.position.set(townCenter - 25, 3.7, 0.5); 
-            pubBuilding.scale.set(6, 5, 1);
+            // Moved Pub to a height (y) of 4.5
+            pubBuilding.position.set(townCenter - 25, 4.7, 0.5); 
+            pubBuilding.scale.set(6.75, 5.62, 1);
             scene.add(pubBuilding);
 
-            // Barkeeper in front of Pub
             const barkeeper = new THREE.Sprite(MATERIALS.barkeeper);
+            // Adjusted barkeeper to stand on the elevated pub floor area if needed, 
+            // but keeping him visible relative to the new pub height.
             barkeeper.position.set(townCenter - 25, 2.2, 1.5);
             barkeeper.scale.set(1.6, 1.6, 1);
             barkeeper.userData = { type: 'npc', name: 'Barkeeper', msg: 'Welcome to the Sprite Lounge. Rest your weary legs, stranger.' };
             scene.add(barkeeper);
             npcs.push(barkeeper);
 
-            // Merchant
             const shopkeeper = new THREE.Sprite(MATERIALS.shopkeeper);
             shopkeeper.position.set(townCenter + 5, 2, 1.5); 
             shopkeeper.scale.set(1.6, 1.6, 1);
@@ -406,7 +419,6 @@
             scene.add(shopkeeper);
             npcs.push(shopkeeper);
 
-            // Mayor
             const villager = new THREE.Sprite(MATERIALS.npc);
             villager.position.set(townCenter - 8, 2, 1.5);
             villager.scale.set(1.5, 1.5, 1);
@@ -493,7 +505,6 @@
                 isMoving = true;
             }
 
-            // Animation Handling
             let targetAnim = 'stand';
             if (isMoving) {
                 targetAnim = player.userData.facingRight ? 'runRight' : 'runLeft';
@@ -515,7 +526,7 @@
                 }
             } else {
                 player.userData.animTimer++;
-                if (player.userData.animTimer > 5) { // ~12 FPS
+                if (player.userData.animTimer > 5) {
                     player.userData.animFrame = (player.userData.animFrame + 1) % 11;
                     player.userData.animTimer = 0;
                 }
@@ -544,7 +555,6 @@
                 sfx.jump();
             }
 
-            // Smooth camera follow
             camera.position.x += (player.position.x - camera.position.x) * 0.1;
             camera.position.y += (Math.max(5, player.position.y + 1) - camera.position.y) * 0.05;
             
@@ -629,11 +639,11 @@
             const btn = document.getElementById('music-btn');
             btn.innerText = musicEnabled ? "Music: ON" : "Music: OFF";
             
-            const music = document.getElementById('bg-music');
+            const currentMusic = gameActive ? document.getElementById('game-music') : document.getElementById('menu-music');
             if (musicEnabled) {
-                music.play().catch(e => console.warn(e));
+                currentMusic.play().catch(e => console.warn(e));
             } else {
-                music.pause();
+                currentMusic.pause();
             }
         }
 
@@ -662,10 +672,10 @@
         }
 
         function startGame() {
+            gameActive = true;
             document.getElementById('menu-screen').style.display = 'none';
             document.getElementById('game-ui').classList.remove('hidden');
-            tryStartMusic();
-            setTimeout(() => { gameActive = true; }, 100);
+            switchMusicToGame();
         }
 
         function closeShop() { document.getElementById('shop-ui').style.display = 'none'; }
@@ -673,8 +683,7 @@
         function gameOver() {
             gameActive = false;
             sfx.damage();
-            const music = document.getElementById('bg-music');
-            if (music) music.pause();
+            document.getElementById('game-music').pause();
             alert("Captured by Magikarp! Gold lost: " + stats.gold);
             location.reload();
         }
