@@ -215,7 +215,7 @@
 
     <!-- IN-GAME UI -->
     <div id="game-ui" class="hidden">
-        <div id="zone-display" class="text-3xl text-cyan-400">SpriteVille</div>
+        <div id="zone-display" class="text-3xl text-cyan-400">SpriteVille Town</div>
         <div id="stats" class="text-xl">Gold: <span id="gold-val">0</span></div>
     </div>
 
@@ -300,14 +300,15 @@
 
             clock = new THREE.Clock();
 
-            MATERIALS.player = new THREE.SpriteMaterial({ map: textureLoader.load(SPRITES.player) });
+            // Load textures
+            const playerTex = textureLoader.load(SPRITES.player);
+            playerTex.repeat.set(0.5, 1);
+            playerTex.offset.set(0, 0);
+
+            MATERIALS.player = new THREE.SpriteMaterial({ map: playerTex });
             MATERIALS.enemy = new THREE.SpriteMaterial({ map: textureLoader.load(SPRITES.enemy) });
             MATERIALS.brick = new THREE.SpriteMaterial({ map: textureLoader.load(SPRITES.brick) });
             MATERIALS.bullet = new THREE.SpriteMaterial({ map: textureLoader.load(SPRITES.bullet) });
-
-            // Setup Player Sprite Animation (2 columns, 1 row)
-            MATERIALS.player.map.repeat.set(1/2, 1);
-            MATERIALS.player.map.offset.set(0, 0);
 
             buildWorld();
             createPlayer();
@@ -439,10 +440,10 @@
             // Handle Player Animations & Flipping
             const frameIndex = isMoving ? (Math.floor(debug.frames / 10) % 2) : 0;
             if(lastFacingRight) {
-                MATERIALS.player.map.repeat.set(1/2, 1);
+                MATERIALS.player.map.repeat.set(0.5, 1);
                 MATERIALS.player.map.offset.x = frameIndex * 0.5;
             } else {
-                MATERIALS.player.map.repeat.set(-1/2, 1);
+                MATERIALS.player.map.repeat.set(-0.5, 1);
                 MATERIALS.player.map.offset.x = (frameIndex * 0.5) + 0.5;
             }
 
@@ -551,7 +552,6 @@
 
         function onLoadGame() {
             console.log("Loading saved game state...");
-            // Load saved state logic goes here
             onNewGame();
         }
 
@@ -560,7 +560,7 @@
             if (isPaused) closeOptions(); else openOptions();
         }
 
-        function tryStartMenuMusic() { /* Placeholder for audio context handling */ }
+        function tryStartMenuMusic() { /* Audio system handler */ }
         function updateVolume(v) { globalMusicVol = v/100; }
         function toggleMusic() { musicEnabled = !musicEnabled; document.getElementById('music-btn').innerText = `Music: ${musicEnabled?'ON':'OFF'}`; }
         function toggleSFX() { sfxEnabled = !sfxEnabled; document.getElementById('sfx-btn').innerText = `Sound FX: ${sfxEnabled?'ON':'OFF'}`; }
