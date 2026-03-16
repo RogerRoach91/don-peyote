@@ -247,7 +247,7 @@
         const VIEW_SIZE = 4.2;
         const textureLoader = new THREE.TextureLoader();
         const townCenter = 0;
-        const BIOME_RANGE = 60; // Distance from center where transition starts
+        const BIOME_RANGE = 50; 
         
         let worldGroup, interiorGroup; 
         let pubBuilding = null;
@@ -354,20 +354,20 @@
         }
 
         function buildBiomeBackgrounds() {
-            const h = 18;
+            const h = 10; // Scaled down height
             const w = h * (16/9);
 
             const biomes = [
                 { id: 'town', url: SPRITES.bgTown, z: -5 },
-                { id: 'forestLeft', url: SPRITES.bgForestLeft, z: -6 },
-                { id: 'forestRight', url: SPRITES.bgForestRight, z: -6 }
+                { id: 'forestLeft', url: SPRITES.bgForestLeft, z: -5.1 },
+                { id: 'forestRight', url: SPRITES.bgForestRight, z: -5.1 }
             ];
 
             biomes.forEach(biome => {
                 const group = new THREE.Group();
                 textureLoader.load(biome.url, (tex) => {
                     tex.magFilter = THREE.LinearFilter;
-                    // Tiles to cover the whole possible world view
+                    // Tiles to cover world
                     for (let i = -10; i <= 20; i++) {
                         const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: biome.id === 'town' ? 1 : 0 });
                         const geom = new THREE.PlaneGeometry(w, h);
@@ -557,32 +557,37 @@
                 if (player.material.map) player.material.map.offset.x = player.userData.animFrame / 11;
             }
 
-            // --- BIOME TRANSITION & PARALLAX ---
+            // --- REFINED BIOME TRANSITION & PARALLAX ---
             if (!isInside) {
                 const px = player.position.x;
                 let townOpacity = 1;
                 let leftForestOpacity = 0;
                 let rightForestOpacity = 0;
 
-                // Transition Logic
+                // Thresholds for fading
                 if (px < -BIOME_RANGE) {
-                    const factor = Math.min(1, Math.abs(px + BIOME_RANGE) / 20);
+                    const factor = Math.min(1, Math.abs(px + BIOME_RANGE) / 15);
                     townOpacity = 1 - factor;
                     leftForestOpacity = factor;
                 } else if (px > BIOME_RANGE) {
-                    const factor = Math.min(1, (px - BIOME_RANGE) / 20);
+                    const factor = Math.min(1, (px - BIOME_RANGE) / 15);
                     townOpacity = 1 - factor;
                     rightForestOpacity = factor;
                 }
 
-                // Apply Opacity and Parallax
+                // Parallax and Opacity updates
                 Object.keys(bgLayers).forEach(key => {
                     const layer = bgLayers[key];
                     const targetOpacity = key === 'town' ? townOpacity : (key === 'forestLeft' ? leftForestOpacity : rightForestOpacity);
                     
                     layer.children.forEach(mesh => {
-                        mesh.material.opacity = THREE.MathUtils.lerp(mesh.material.opacity, targetOpacity, 0.1);
-                        // Parallax effect
+                        // Fade
+                        mesh.material.opacity = THREE.MathUtils.lerp(mesh.material.opacity, targetOpacity, 0.05);
+                        
+                        // Vertical parallax (follow camera)
+                        mesh.position.y = camera.position.y;
+                        
+                        // Horizontal Parallax
                         if (!mesh.userData.startX) mesh.userData.startX = mesh.position.x;
                         mesh.position.x = mesh.userData.startX + (camera.position.x * 0.9);
                     });
