@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Luckiest Guy', cursive; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Luckiest Guy', cursive; }
         canvas { display: block; }
         
         .full-overlay {
@@ -23,7 +23,7 @@
         }
 
         #menu-screen {
-            background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-start-screen.png');
+            background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url('https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-start-screen.png');
             background-color: #1e3a8a;
             background-size: cover;
             background-position: center;
@@ -100,6 +100,15 @@
             display: none;
             z-index: 500;
             pointer-events: auto;
+            min-width: 300px;
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #333;
         }
 
         .buy-btn {
@@ -131,6 +140,25 @@
             transition: opacity 0.5s;
             z-index: 1000;
         }
+
+        .volume-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 10px;
+            background: #334155;
+            outline: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #22d3ee;
+            border-radius: 50%;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body onclick="tryStartMenuMusic()">
@@ -152,8 +180,15 @@
         <div class="options-panel">
             <h2 class="text-4xl text-cyan-400 text-center mb-2">Settings</h2>
             <button onclick="toggleMusic()" id="music-btn" class="menu-btn bg-cyan-900/50 rounded-lg text-lg py-2">Music: ON</button>
+            <div class="flex flex-col gap-1 px-4">
+                <label class="text-white text-sm flex justify-between">
+                    <span>Music Volume</span>
+                    <span id="vol-label">40%</span>
+                </label>
+                <input type="range" min="0" max="100" value="40" class="volume-slider" id="music-vol" oninput="updateVolume(this.value)">
+            </div>
             <button onclick="toggleSfx()" id="sfx-btn" class="menu-btn bg-cyan-900/50 rounded-lg text-lg py-2">Sounds: ON</button>
-            <button onclick="toggleWireframe()" id="wireframe-btn" class="w-full py-2 bg-yellow-900/30 border border-yellow-500/50 rounded-lg text-white">Wireframe: OFF</button>
+            <button onclick="toggleWireframe()" id="wireframe-btn" class="mt-2 w-full py-2 bg-yellow-900/30 border border-yellow-500/50 rounded-lg text-white">Wireframe: OFF</button>
             <button onclick="closeOptions()" class="mt-4 p-3 bg-red-600/80 text-white rounded-xl">Close</button>
         </div>
     </div>
@@ -171,15 +206,57 @@
 
     <div id="shop-ui">
         <h2 class="text-2xl text-yellow-400 mb-4 text-center">Town Shop</h2>
-        <div class="flex flex-col gap-2">
-            <div class="flex justify-between items-center"><span>Health Potion</span><button class="buy-btn" onclick="buyItem('potion', 10)">10G</button></div>
-            <div class="flex justify-between items-center"><span>Speed Boots</span><button class="buy-btn" onclick="buyItem('boots', 50)">50G</button></div>
-        </div>
+        <div class="shop-item"><span>Health Potion</span><button class="buy-btn" onclick="buyItem('potion', 10)">10G</button></div>
+        <div class="shop-item"><span>Speed Boots</span><button class="buy-btn" onclick="buyItem('boots', 50)">50G</button></div>
         <button class="mt-4 w-full text-red-400" onclick="closeShop()">Close</button>
     </div>
 
     <script>
-        // --- CORE STATE ---
+        // --- AUDIO ENGINE ---
+        let audioCtx;
+        let menuMusicStarted = false, gameMusicStarted = false;
+        let globalMusicVol = 0.4, musicEnabled = true, sfxEnabled = true;
+
+        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        function updateVolume(v) { 
+            globalMusicVol = v/100; 
+            document.getElementById('vol-label').innerText = v + "%"; 
+            document.getElementById('menu-music').volume = globalMusicVol;
+            document.getElementById('game-music').volume = globalMusicVol;
+        }
+        function tryStartMenuMusic() { 
+            initAudio(); 
+            if (musicEnabled && !menuMusicStarted && !gameActive) { 
+                const m = document.getElementById('menu-music'); 
+                m.volume = globalMusicVol; 
+                m.play().then(() => menuMusicStarted = true).catch(() => {}); 
+            } 
+        }
+        function switchMusicToGame() { 
+            document.getElementById('menu-music').pause(); 
+            if (musicEnabled) { 
+                const g = document.getElementById('game-music'); 
+                g.volume = globalMusicVol; 
+                g.play().then(() => gameMusicStarted = true).catch(() => {}); 
+            } 
+        }
+        function playSfx(f, t, d, v) { 
+            if (!audioCtx || !sfxEnabled) return; 
+            const o = audioCtx.createOscillator(), g = audioCtx.createGain(); 
+            o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime); 
+            g.gain.setValueAtTime(v, audioCtx.currentTime); 
+            g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d); 
+            o.connect(g); g.connect(audioCtx.destination); 
+            o.start(); o.stop(audioCtx.currentTime + d); 
+        }
+        const sfx = { 
+            jump: () => playSfx(400, 'square', 0.1, 0.1), 
+            shoot: () => playSfx(150, 'sawtooth', 0.1, 0.05), 
+            collect: () => playSfx(800, 'sine', 0.2, 0.1),
+            door: () => playSfx(200, 'triangle', 0.3, 0.1)
+        };
+
+        // --- CORE GAME ENGINE ---
         let scene, camera, renderer, clock;
         let player, interactSprite, bgLayers = {}, enemies = [], platforms = [], npcs = [], projectiles = [];
         let keys = {};
@@ -227,7 +304,6 @@
             scene.add(new THREE.AmbientLight(0xffffff, 1.2));
             clock = new THREE.Clock();
 
-            // Load Materials
             const createMat = (url, tilesX = 1) => {
                 const mat = new THREE.SpriteMaterial({ map: null, transparent: true });
                 textureLoader.load(url, (t) => {
@@ -283,7 +359,7 @@
         }
 
         function buildBackgrounds() {
-            // REDUCED SIZE: Height 5 instead of 10 (50% smaller)
+            // REDUCED SIZE: Height 5.2 instead of 10 (approx 50% smaller)
             const h = 5.2; 
             const w = h * (16/9);
 
@@ -297,11 +373,10 @@
                 const group = new THREE.Group();
                 textureLoader.load(conf.url, (tex) => {
                     tex.magFilter = THREE.LinearFilter;
-                    // Tiles to cover 1000+ units of world
                     for (let i = -10; i <= 25; i++) {
                         const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: conf.id === 'town' ? 1 : 0 });
                         const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-                        plane.position.set(i * w, 3.8, conf.z); // Fixed height near gameplay floor
+                        plane.position.set(i * w, 3.8, conf.z); // Anchored tighter to floor
                         group.add(plane);
                     }
                 });
@@ -324,7 +399,6 @@
         }
 
         function buildWorld() {
-            // Floor
             for(let x = -400; x < 1000; x += 2) {
                 const tile = new THREE.Sprite(MATERIALS.grass);
                 tile.scale.set(2, 2, 1); tile.position.set(x, 0, 1);
@@ -332,7 +406,6 @@
             }
             platforms.push({ x: 300, y: 0, w: 2000, h: 2, group: worldGroup });
 
-            // Town Center
             pubBuilding = new THREE.Sprite(MATERIALS.pub);
             pubBuilding.position.set(townCenter - 25, 3.4, 0.5); 
             pubBuilding.scale.set(5.06, 4.21, 1);
@@ -341,7 +414,6 @@
             spawnNPC(townCenter + 5, 2, 'shopkeeper', { type: 'shop' }, worldGroup);
             spawnNPC(townCenter - 8, 2, 'npc', { type: 'npc', msg: 'The world is big beyond the forest!' }, worldGroup);
 
-            // Level Gen
             for(let i=0; i<300; i++) {
                 const x = (Math.random() * 1400) - 400;
                 if(Math.abs(x - townCenter) < 40) continue; 
@@ -421,13 +493,13 @@
                 }
             });
 
-            if(keys['Space'] && player.userData.onGround) { player.userData.vy = 0.32; }
+            if(keys['Space'] && player.userData.onGround) { player.userData.vy = 0.32; sfx.jump(); }
 
-            // Camera & Parallax
+            // Camera
             camera.position.x += (player.position.x - camera.position.x) * 0.1;
             camera.position.y += (Math.max(4, player.position.y + 1) - camera.position.y) * 0.05;
 
-            // Update Biomes & Backgrounds
+            // Biomes & Backgrounds
             if (!isInside) {
                 const px = player.position.x;
                 let tOp = 1, flOp = 0, frOp = 0;
@@ -439,34 +511,21 @@
                     const target = (k === 'town' ? tOp : (k === 'forestLeft' ? flOp : frOp));
                     layer.children.forEach(m => {
                         m.material.opacity = THREE.MathUtils.lerp(m.material.opacity, target, 0.05);
-                        // FIXED VERTICAL: Height logic to keep backgrounds relative to world floor
-                        m.position.y = 3.8 + (camera.position.y - 5) * 0.2; 
-                        // Horizontal Parallax (Very slight to keep world feeling connected)
+                        m.position.y = 3.8 + (camera.position.y - 5) * 0.15; // Scaled Parallax
                         if (!m.userData.startX) m.userData.startX = m.position.x;
-                        m.position.x = m.userData.startX + (camera.position.x * 0.85);
+                        m.position.x = m.userData.startX + (camera.position.x * 0.88);
                     });
                 });
             }
 
-            // NPC Interaction Check
+            // Interaction
             let interacting = false;
-            npcs.forEach(n => {
-                if(n.group.visible && player.position.distanceTo(n.sprite.position) < 2.5) interacting = true;
-            });
-            if(!isInside && Math.abs(player.position.x - (pubBuilding.position.x - 1.2)) < 1.5) interacting = true;
+            if (!isInside && pubBuilding && Math.abs(player.position.x - (pubBuilding.position.x - 1.2)) < 1.5) interacting = true;
             else if(isInside && Math.abs(player.position.x - (-8)) < 2) interacting = true;
+            npcs.forEach(n => { if(n.group.visible && player.position.distanceTo(n.sprite.position) < 2.5) interacting = true; });
 
             interactSprite.visible = interacting;
             if(interacting) interactSprite.position.set(player.position.x, player.position.y + 1.6, 3);
-
-            // Enemies
-            if(!isInside) {
-                enemies.forEach(en => {
-                    en.position.x += 0.04 * en.userData.dir;
-                    if(Math.abs(en.position.x - en.userData.startX) > en.userData.range) en.userData.dir *= -1;
-                    if(player.position.distanceTo(en.position) < 1.2) triggerRespawn();
-                });
-            }
 
             if(player.position.y < -10) triggerRespawn();
             
@@ -476,11 +535,8 @@
 
         function handleInteraction() {
             if(isPaused) return;
-            if (!isInside && Math.abs(player.position.x - (pubBuilding.position.x - 1.2)) < 1.5) {
-                transition(true);
-            } else if (isInside && Math.abs(player.position.x - (-8)) < 2) {
-                transition(false);
-            }
+            if (!isInside && Math.abs(player.position.x - (pubBuilding.position.x - 1.2)) < 1.5) { transition(true); }
+            else if (isInside && Math.abs(player.position.x - (-8)) < 2) { transition(false); }
 
             npcs.forEach(n => {
                 if(n.group.visible && player.position.distanceTo(n.sprite.position) < 2.5) {
@@ -492,11 +548,9 @@
 
         function transition(toInside) {
             const fade = document.getElementById('fade-overlay');
-            fade.style.opacity = '1';
+            fade.style.opacity = '1'; sfx.door();
             setTimeout(() => {
-                isInside = toInside;
-                worldGroup.visible = !toInside;
-                interiorGroup.visible = toInside;
+                isInside = toInside; worldGroup.visible = !toInside; interiorGroup.visible = toInside;
                 player.position.set(toInside ? -6 : pubBuilding.position.x - 1.2, 2, 2);
                 fade.style.opacity = '0';
             }, 500);
@@ -512,33 +566,17 @@
             }, 1000);
         }
 
-        function shoot() {
-            const b = new THREE.Sprite(MATERIALS.bullet);
-            b.position.copy(player.position); b.scale.set(0.6, 0.6, 1);
-            b.userData = { vx: player.userData.facingRight ? 0.4 : -0.4 };
-            projectiles.push(b); scene.add(b);
-            // Simple removal
-            setTimeout(() => { scene.remove(b); projectiles = projectiles.filter(p => p !== b); }, 2000);
-        }
-
-        function updateUI() {
-            document.getElementById('gold-val').innerText = stats.gold;
-            document.getElementById('pot-val').innerText = stats.potions;
-        }
-
+        function shoot() { sfx.shoot(); const b = new THREE.Sprite(MATERIALS.bullet); b.position.copy(player.position); b.scale.set(0.6, 0.6, 1); b.userData = { vx: player.userData.facingRight ? 0.4 : -0.4 }; projectiles.push(b); scene.add(b); setTimeout(() => { scene.remove(b); projectiles = projectiles.filter(p => p !== b); }, 2000); }
+        function updateUI() { document.getElementById('gold-val').innerText = stats.gold; document.getElementById('pot-val').innerText = stats.potions; }
         function showMessage(m) { const d = document.createElement('div'); d.className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-white p-4 rounded-xl text-black z-[1000]"; d.innerText=m; document.body.appendChild(d); setTimeout(()=>d.remove(), 2000); }
-        function buyItem(id, p) { if(stats.gold >= p) { stats.gold -= p; if(id==='potion') stats.potions++; if(id==='boots') stats.speedMult=1.5; } else showMessage("Not enough gold!"); }
+        function buyItem(id, p) { if(stats.gold >= p) { stats.gold -= p; sfx.collect(); if(id==='potion') stats.potions++; if(id==='boots') stats.speedMult=1.5; } else showMessage("Not enough gold!"); }
         function onNewGame() { document.getElementById('menu-screen').style.display = 'none'; startGame(); }
-        function startGame() { gameActive = true; document.getElementById('game-ui').classList.remove('hidden'); }
+        function startGame() { gameActive = true; document.getElementById('game-ui').classList.remove('hidden'); switchMusicToGame(); }
         function openOptions() { document.getElementById('options-overlay').style.display = 'flex'; isPaused = true; }
         function closeOptions() { document.getElementById('options-overlay').style.display = 'none'; isPaused = false; }
+        function toggleWireframe() { wireframeMode = !wireframeMode; document.getElementById('wireframe-btn').innerText = `Wireframe: ${wireframeMode?'ON':'OFF'}`; }
         function closeShop() { document.getElementById('shop-ui').style.display = 'none'; }
-        function onResize() { 
-            const aspect = window.innerWidth / window.innerHeight; 
-            camera.left = -VIEW_SIZE * aspect; camera.right = VIEW_SIZE * aspect; 
-            camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); 
-        }
-
+        function onResize() { const aspect = window.innerWidth / window.innerHeight; camera.left = -VIEW_SIZE * aspect; camera.right = VIEW_SIZE * aspect; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
         window.onload = init;
     </script>
 </body>
