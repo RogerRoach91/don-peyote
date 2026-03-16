@@ -255,6 +255,10 @@
         let sfxEnabled = true;
         let stats = { gold: 0, potions: 0, speedMult: 1 };
         
+        // --- CAMERA CONFIG ---
+        // Reduced from 8 to 5 for a tighter zoom
+        const VIEW_SIZE = 5; 
+
         const textureLoader = new THREE.TextureLoader();
         const worldSize = 2000;
         const townCenter = 0; 
@@ -314,7 +318,7 @@
             scene.background = new THREE.Color(0x87CEEB);
 
             const aspect = window.innerWidth / window.innerHeight;
-            camera = new THREE.OrthographicCamera(-8*aspect, 8*aspect, 8, -8, 0.1, 1000);
+            camera = new THREE.OrthographicCamera(-VIEW_SIZE * aspect, VIEW_SIZE * aspect, VIEW_SIZE, -VIEW_SIZE, 0.1, 1000);
             camera.position.set(0, 5, 10);
 
             renderer = new THREE.WebGLRenderer({ antialias: false });
@@ -356,7 +360,7 @@
 
         function createPlayer() {
             player = new THREE.Sprite(MATERIALS.playerStand);
-            // 2.2 matches the intended 140px relative to the 8-unit orthographic camera height
+            // 2.2 matches the intended 140px scale
             player.scale.set(2.2, 2.2, 1);
             player.position.set(townCenter, 5, 2);
             player.userData = { 
@@ -384,7 +388,6 @@
             
             // The Pub
             const pubBuilding = new THREE.Sprite(MATERIALS.pub);
-            // Adjusted Y to 5.5 to lift slightly while burying padding.
             pubBuilding.position.set(townCenter - 25, 5.5, 0.5);
             pubBuilding.scale.set(12, 10, 1);
             scene.add(pubBuilding);
@@ -415,7 +418,7 @@
 
             for(let i=0; i<150; i++) {
                 const x = (Math.random() * 1000) - 200;
-                if(Math.abs(x - townCenter) < 40) continue; // Keep town area clear
+                if(Math.abs(x - townCenter) < 40) continue; 
                 
                 const y = 3 + Math.random() * 7;
                 const p = new THREE.Sprite(MATERIALS.brick);
@@ -474,7 +477,6 @@
         function animate() {
             requestAnimationFrame(animate);
             if(!gameActive || isPaused) {
-                // Render once to keep current frame visible if we just paused
                 renderer.render(scene, camera);
                 return;
             }
@@ -515,7 +517,7 @@
                 }
             } else {
                 player.userData.animTimer++;
-                if (player.userData.animTimer > 5) { // ~12 FPS at 60Hz update rate
+                if (player.userData.animTimer > 5) { // ~12 FPS
                     player.userData.animFrame = (player.userData.animFrame + 1) % 11;
                     player.userData.animTimer = 0;
                 }
@@ -529,9 +531,8 @@
 
             player.userData.onGround = false;
             platforms.forEach(p => {
-                if(Math.abs(player.position.x - p.x) < (p.w/2 + 0.6)) { // Adjusted for wider scale
+                if(Math.abs(player.position.x - p.x) < (p.w/2 + 0.6)) {
                     const top = p.y + p.h/2;
-                    // Player half-height is now ~1.1
                     if(player.position.y - 1.1 <= top && player.position.y > p.y && player.userData.vy <= 0) {
                         player.position.y = top + 1.1;
                         player.userData.vy = 0;
@@ -545,17 +546,17 @@
                 sfx.jump();
             }
 
+            // Smooth camera follow
             camera.position.x += (player.position.x - camera.position.x) * 0.1;
+            // Vertical camera logic to follow player but keep ground in view
+            camera.position.y += (Math.max(5, player.position.y + 1) - camera.position.y) * 0.05;
+            
             updateUI();
-
-            let near = false;
-            npcs.forEach(npc => { if(player.position.distanceTo(npc.position) < 2.5) near = true; });
-            document.getElementById('interaction-prompt').style.display = 'none';
 
             enemies.forEach(en => {
                 en.position.x += 0.04 * en.userData.dir;
                 if(Math.abs(en.position.x - en.userData.startX) > en.userData.range) en.userData.dir *= -1;
-                if(player.position.distanceTo(en.position) < 1.2) { // Adjusted hit detection for scale
+                if(player.position.distanceTo(en.position) < 1.2) {
                     if(stats.potions > 0) {
                         stats.potions--;
                         player.position.y += 2;
@@ -666,10 +667,7 @@
         function startGame() {
             document.getElementById('menu-screen').style.display = 'none';
             document.getElementById('game-ui').classList.remove('hidden');
-            
-            // Ensure music is playing if it wasn't already
             tryStartMusic();
-
             setTimeout(() => { gameActive = true; }, 100);
         }
 
@@ -680,7 +678,6 @@
             sfx.damage();
             const music = document.getElementById('bg-music');
             if (music) music.pause();
-            
             alert("Captured by Magikarp! Gold lost: " + stats.gold);
             location.reload();
         }
@@ -695,7 +692,10 @@
 
         function onResize() {
             const aspect = window.innerWidth / window.innerHeight;
-            camera.left = -8*aspect; camera.right = 8*aspect;
+            camera.left = -VIEW_SIZE * aspect; 
+            camera.right = VIEW_SIZE * aspect;
+            camera.top = VIEW_SIZE;
+            camera.bottom = -VIEW_SIZE;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
