@@ -263,7 +263,9 @@
         let MATERIALS = {}; 
 
         const SPRITES = {
-            player: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-standing-sprite-sheet-2x1-140Px140P.png',
+            playerStand: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-standing-sprite-sheet-2x1-140Px140P.png',
+            playerRunLeft: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-run-cycle-left-12fps.png',
+            playerRunRight: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-run-cycle-right-12fps.png',
             enemy: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/129.png',
             npc: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/151.png',
             shopkeeper: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/122.png',
@@ -323,7 +325,9 @@
             clock = new THREE.Clock();
 
             MATERIALS = {
-                player: createSafeMaterial(SPRITES.player, '#ffff00', 2, 1),
+                playerStand: createSafeMaterial(SPRITES.playerStand, '#ffff00', 2, 1),
+                playerRunLeft: createSafeMaterial(SPRITES.playerRunLeft, '#ffff00', 11, 1),
+                playerRunRight: createSafeMaterial(SPRITES.playerRunRight, '#ffff00', 11, 1),
                 enemy: createSafeMaterial(SPRITES.enemy, '#ff0000'),
                 npc: createSafeMaterial(SPRITES.npc, '#ffffff'),
                 shopkeeper: createSafeMaterial(SPRITES.shopkeeper, '#ff00ff'),
@@ -351,11 +355,18 @@
         }
 
         function createPlayer() {
-            player = new THREE.Sprite(MATERIALS.player);
+            player = new THREE.Sprite(MATERIALS.playerStand);
             // 2.2 matches the intended 140px relative to the 8-unit orthographic camera height
             player.scale.set(2.2, 2.2, 1);
             player.position.set(townCenter, 5, 2);
-            player.userData = { vy: 0, onGround: false, facingRight: true };
+            player.userData = { 
+                vy: 0, 
+                onGround: false, 
+                facingRight: true,
+                currentAnim: 'stand',
+                animFrame: 0,
+                animTimer: 0
+            };
             scene.add(player);
             camera.position.x = townCenter;
         }
@@ -469,18 +480,48 @@
             }
 
             const speed = 0.15 * stats.speedMult;
+            let isMoving = false;
+
             if(keys['KeyA'] || keys['ArrowLeft']) { 
                 player.position.x -= speed; 
                 player.userData.facingRight = false; 
+                isMoving = true;
             }
             if(keys['KeyD'] || keys['ArrowRight']) { 
                 player.position.x += speed; 
                 player.userData.facingRight = true; 
+                isMoving = true;
             }
 
-            if(player.material.map) {
-                // Second sprite (index 1) is facing right, first (index 0) is facing left
-                player.material.map.offset.x = player.userData.facingRight ? 0.5 : 0;
+            // Animation Handling
+            let targetAnim = 'stand';
+            if (isMoving) {
+                targetAnim = player.userData.facingRight ? 'runRight' : 'runLeft';
+            }
+
+            if (player.userData.currentAnim !== targetAnim) {
+                player.userData.currentAnim = targetAnim;
+                player.userData.animFrame = 0;
+                player.userData.animTimer = 0;
+                
+                if (targetAnim === 'runRight') player.material = MATERIALS.playerRunRight;
+                else if (targetAnim === 'runLeft') player.material = MATERIALS.playerRunLeft;
+                else player.material = MATERIALS.playerStand;
+            }
+
+            if (targetAnim === 'stand') {
+                if (player.material.map) {
+                    player.material.map.offset.x = player.userData.facingRight ? 0.5 : 0;
+                }
+            } else {
+                player.userData.animTimer++;
+                if (player.userData.animTimer > 5) { // ~12 FPS at 60Hz update rate
+                    player.userData.animFrame = (player.userData.animFrame + 1) % 11;
+                    player.userData.animTimer = 0;
+                }
+                if (player.material.map) {
+                    player.material.map.offset.x = player.userData.animFrame / 11;
+                }
             }
 
             player.userData.vy += GRAVITY;
