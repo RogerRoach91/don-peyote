@@ -398,9 +398,10 @@
             platforms.push({ x: 300, y: 0, w: 1000, h: 2 });
 
             const pubBuilding = new THREE.Sprite(MATERIALS.pub);
-            // Moved Pub to a height (y) of 4.5
+            // Moved Pub to a height (y) of 4.7
             pubBuilding.position.set(townCenter - 25, 4.7, 0.5); 
-            pubBuilding.scale.set(6.75, 5.62, 1);
+            // Scale reduced by 25%: Width 6.75 -> 5.06, Height 5.62 -> 4.21
+            pubBuilding.scale.set(5.06, 4.21, 1);
             scene.add(pubBuilding);
 
             const barkeeper = new THREE.Sprite(MATERIALS.barkeeper);
