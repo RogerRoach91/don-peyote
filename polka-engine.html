@@ -204,7 +204,6 @@
 
             <button onclick="toggleSfx()" id="sfx-btn" class="menu-btn bg-cyan-900/50 rounded-lg text-lg py-2">Sounds: ON</button>
             
-            <!-- DEBUG MENU SECTION -->
             <div class="mt-4 pt-4 border-t border-cyan-800/50">
                 <h3 class="text-xl text-yellow-400 text-center mb-3">Debug Menu</h3>
                 <button onclick="toggleWireframe()" id="wireframe-btn" class="w-full py-2 bg-yellow-900/30 border border-yellow-500/50 rounded-lg text-white text-lg">
@@ -327,6 +326,7 @@
         const townRadius = 50;
         
         let MATERIALS = {}; 
+        let pubBuilding = null; // Ref for the pub
 
         const SPRITES = {
             playerStand: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/don-peyote-standing-sprite-sheet-2x1-140Px140P.png',
@@ -339,6 +339,7 @@
             brick: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/11.png',
             bullet: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/items/poke-ball.png',
             pub: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/pub850x700.png',
+            pubOpen: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/pub-door-open-850x700.png',
             barkeeper: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/113.png'
         };
 
@@ -406,6 +407,7 @@
                 brick: createSafeMaterial(SPRITES.brick, '#8b4513'),
                 bullet: createSafeMaterial(SPRITES.bullet, '#ffffff'),
                 pub: createSafeMaterial(SPRITES.pub, '#444444'),
+                pubOpen: createSafeMaterial(SPRITES.pubOpen, '#444444'),
                 barkeeper: createSafeMaterial(SPRITES.barkeeper, '#ffaaaa')
             };
 
@@ -450,7 +452,7 @@
             addPlatform(300, 0, 1000, 2);
 
             // Buildings
-            const pubBuilding = new THREE.Sprite(MATERIALS.pub);
+            pubBuilding = new THREE.Sprite(MATERIALS.pub);
             pubBuilding.position.set(townCenter - 25, 3.4, 0.5); 
             pubBuilding.scale.set(5.06, 4.21, 1);
             scene.add(pubBuilding);
@@ -558,6 +560,18 @@
             } else {
                 if (++player.userData.animTimer > 5) { player.userData.animFrame = (player.userData.animFrame + 1) % 11; player.userData.animTimer = 0; }
                 if (player.material.map) player.material.map.offset.x = player.userData.animFrame / 11;
+            }
+
+            // Pub Door Logic
+            if (pubBuilding) {
+                // The door is roughly at the left side of the asset (Pub X - Width/4)
+                const doorPosX = pubBuilding.position.x - 1.2; 
+                const distToDoor = Math.abs(player.position.x - doorPosX);
+                if (distToDoor < 1.5) {
+                    pubBuilding.material = MATERIALS.pubOpen;
+                } else {
+                    pubBuilding.material = MATERIALS.pub;
+                }
             }
 
             // Physics
