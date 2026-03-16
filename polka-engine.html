@@ -135,28 +135,6 @@
             object-fit: cover;
         }
 
-        /* Updated Tooltip Styling to Top Right */
-        #interaction-prompt {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.9);
-            color: #1e293b;
-            padding: 12px 24px;
-            border-radius: 12px;
-            border: 3px solid #22d3ee;
-            display: none;
-            font-size: 1.2rem;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            z-index: 200;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
         #fade-overlay {
             position: fixed;
             inset: 0;
@@ -245,8 +223,6 @@
         <button class="mt-4 w-full text-red-400" onclick="closeShop()">Close</button>
     </div>
 
-    <div id="interaction-prompt">Press 'E' to Talk</div>
-
     <script>
         // --- AUDIO ENGINE ---
         let audioCtx;
@@ -262,7 +238,7 @@
 
         // --- GAME ENGINE ---
         let scene, camera, renderer, clock;
-        let player, enemies = [], platforms = [], npcs = [], projectiles = [];
+        let player, interactSprite, enemies = [], platforms = [], npcs = [], projectiles = [];
         let keys = {};
         let gameActive = false, isPaused = false, wireframeMode = false;
         let isInside = false; 
@@ -299,8 +275,23 @@
             const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; return tex;
         }
 
+        function createExclamationTexture() {
+            const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#facc15';
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 4;
+            // Draw circle background
+            ctx.beginPath(); ctx.arc(32, 32, 28, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            // Draw "!"
+            ctx.fillStyle = '#000';
+            ctx.fillRect(28, 12, 8, 24);
+            ctx.fillRect(28, 42, 8, 8);
+            const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; return tex;
+        }
+
         function createSafeMaterial(url, fallback, tilesX = 1, tilesY = 1) {
-            const mat = new THREE.SpriteMaterial({ map: createSolidTexture(fallback) });
+            const mat = new THREE.SpriteMaterial({ map: createSolidTexture(fallback), transparent: true });
             textureLoader.load(url, (t) => { 
                 t.magFilter = THREE.NearestFilter; 
                 if (tilesX > 1 || tilesY > 1) t.repeat.set(1 / tilesX, 1 / tilesY);
@@ -334,7 +325,8 @@
                 pub: createSafeMaterial(SPRITES.pub, '#444444'),
                 pubOpen: createSafeMaterial(SPRITES.pubOpen, '#444444'),
                 barkeeper: createSafeMaterial(SPRITES.barkeeper, '#ffaaaa'),
-                wood: createSafeMaterial(SPRITES.woodFloor, '#634439')
+                wood: createSafeMaterial(SPRITES.woodFloor, '#634439'),
+                exclamation: new THREE.SpriteMaterial({ map: createExclamationTexture(), transparent: true })
             };
 
             worldGroup = new THREE.Group();
@@ -365,6 +357,12 @@
             player.position.set(townCenter, 5, 2);
             player.userData = { vy: 0, onGround: false, facingRight: true, currentAnim: 'stand', animFrame: 0, animTimer: 0, isRespawning: false, helper: createBoxHelper(player, 0x22d3ee) };
             scene.add(player);
+
+            // Create Interaction Indicator (!)
+            interactSprite = new THREE.Sprite(MATERIALS.exclamation);
+            interactSprite.scale.set(0.6, 0.6, 1);
+            interactSprite.visible = false;
+            scene.add(interactSprite);
         }
 
         function buildWorld() {
@@ -531,37 +529,32 @@
                 if (player.material.map) player.material.map.offset.x = player.userData.animFrame / 11;
             }
 
-            // Logic for the Interaction Prompt
-            const prompt = document.getElementById('interaction-prompt');
+            // --- INTERACTION LOGIC ---
             let foundInteraction = false;
-
             if (!isInside && pubBuilding) {
                 const doorPosX = pubBuilding.position.x - 1.2;
                 const distToDoor = Math.abs(player.position.x - doorPosX);
                 pubBuilding.material = distToDoor < 1.5 ? MATERIALS.pubOpen : MATERIALS.pub;
-                if (distToDoor < 1.5) { 
-                    prompt.innerText = "E: Enter Sprite Lounge"; 
-                    foundInteraction = true; 
-                }
+                if (distToDoor < 1.5) foundInteraction = true; 
             } else if (isInside) {
-                const distToExit = Math.abs(player.position.x - (-8));
-                if (distToExit < 1.5) { 
-                    prompt.innerText = "E: Leave Building"; 
-                    foundInteraction = true; 
-                }
+                if (Math.abs(player.position.x - (-8)) < 1.5) foundInteraction = true; 
             }
 
-            // Check NPC proximity for prompt
             if (!foundInteraction) {
                 npcs.forEach(n => {
                     if (n.group.visible && player.position.distanceTo(n.sprite.position) < 2.5) {
-                        prompt.innerText = n.sprite.userData.type === 'shop' ? "E: Open Shop" : `E: Talk to ${n.sprite.userData.name}`;
                         foundInteraction = true;
                     }
                 });
             }
 
-            prompt.style.display = foundInteraction ? "block" : "none";
+            // Update ! Indicator
+            if (foundInteraction) {
+                interactSprite.visible = true;
+                interactSprite.position.set(player.position.x, player.position.y + 1.6 + Math.sin(Date.now() * 0.01) * 0.1, 3);
+            } else {
+                interactSprite.visible = false;
+            }
 
             player.userData.vy += GRAVITY;
             player.position.y += player.userData.vy;
