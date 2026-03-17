@@ -355,7 +355,6 @@
                 enemy: createSafeMaterial(SPRITES.enemy, '#ff0000'),
                 npc: createSafeMaterial(SPRITES.npc, '#ffffff'),
                 shopkeeper: createSafeMaterial(SPRITES.shopkeeper, '#ff00ff'),
-                grass: createSafeMaterial(SPRITES.grass, '#2d5a27', 4, 1),
                 brick: createSafeMaterial(SPRITES.brick, '#8b4513'),
                 bullet: createSafeMaterial(SPRITES.bullet, '#ffffff'),
                 pub: createSafeMaterial(SPRITES.pub, '#444444'),
@@ -363,6 +362,25 @@
                 barkeeper: createSafeMaterial(SPRITES.barkeeper, '#ffaaaa'),
                 exclamation: new THREE.SpriteMaterial({ map: createExclamationTexture(), transparent: true })
             };
+
+            // Pre-create the 4 grass frame materials to avoid cloning issues
+            MATERIALS.grassFrames = [];
+            for(let i = 0; i < 4; i++) {
+                MATERIALS.grassFrames.push(new THREE.SpriteMaterial({ map: createSolidTexture('#2d5a27'), transparent: true }));
+            }
+            
+            // Apply the actual image texture to all 4 materials once it loads
+            textureLoader.load(SPRITES.grass, (t) => {
+                for(let i = 0; i < 4; i++) {
+                    const tex = t.clone();
+                    tex.magFilter = THREE.NearestFilter;
+                    tex.repeat.set(0.25, 1);
+                    tex.offset.x = i / 4;
+                    tex.needsUpdate = true;
+                    MATERIALS.grassFrames[i].map = tex;
+                    MATERIALS.grassFrames[i].needsUpdate = true;
+                }
+            });
 
             worldGroup = new THREE.Group();
             interiorGroup = new THREE.Group();
@@ -432,30 +450,15 @@
         function buildWorld() {
             // Updated grass generation to use the tilesheet
             for(let x = -400; x < 1000; x += 2) {
-                // Clone material so we can set individual offsets
-                const mat = MATERIALS.grass.clone();
-                const tile = new THREE.Sprite(mat);
-                tile.scale.set(2, 2, 1);
-                tile.position.set(x, 1.25, 0.4);
-                
-                // Randomly choose sprite: 10% chance for tiles 1-3, 90% chance for tile 4 (main grass)
+                // Randomly choose sprite: 15% chance for tiles 1-3, 85% chance for tile 4 (main grass)
                 let frame = 3; // Default is the 4th sprite (index 3)
                 if (Math.random() < 0.15) {
                     frame = Math.floor(Math.random() * 3); // Randomly 0, 1, or 2
                 }
                 
-                // Wait for map to be available or it will be set by the loader callback in createSafeMaterial
-                // Since materials are loaded once, we can just set offset if it exists
-                if (mat.map) mat.map.offset.x = frame / 4;
-                else {
-                    // Fallback for async loading
-                    textureLoader.load(SPRITES.grass, (t) => {
-                       mat.map = t;
-                       mat.map.magFilter = THREE.NearestFilter;
-                       mat.map.repeat.set(0.25, 1);
-                       mat.map.offset.x = frame / 4;
-                    });
-                }
+                const tile = new THREE.Sprite(MATERIALS.grassFrames[frame]);
+                tile.scale.set(2, 2, 1);
+                tile.position.set(x, 1.25, 0.4);
                 
                 worldGroup.add(tile);
             }
