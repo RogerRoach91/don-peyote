@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Sprite Open World - Biome Transitions</title>
+    <title>2D Sprite Open World - Clamped Parallax</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -354,29 +354,32 @@
         }
 
         function buildBiomeBackgrounds() {
-            const h = 10; 
-            const w = h * (16/9);
-
+            const h = 18; // Make background tall enough to cover vertical jumps
             const biomes = [
-                { id: 'town', url: SPRITES.bgTown, z: -5 },
-                { id: 'forestLeft', url: SPRITES.bgForestLeft, z: -5.1 },
-                { id: 'forestRight', url: SPRITES.bgForestRight, z: -5.1 }
+                { id: 'town', url: SPRITES.bgTown, z: -5, offsetX: 0 },
+                { id: 'forestLeft', url: SPRITES.bgForestLeft, z: -5.1, offsetX: -120 },
+                { id: 'forestRight', url: SPRITES.bgForestRight, z: -5.1, offsetX: 120 }
             ];
 
             biomes.forEach(biome => {
-                const group = new THREE.Group();
                 textureLoader.load(biome.url, (tex) => {
-                    tex.magFilter = THREE.LinearFilter;
-                    for (let i = -10; i <= 20; i++) {
-                        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: biome.id === 'town' ? 1 : 0 });
-                        const geom = new THREE.PlaneGeometry(w, h);
-                        const plane = new THREE.Mesh(geom, mat);
-                        plane.position.set(i * w, 5, biome.z);
-                        group.add(plane);
-                    }
+                    const aspect = tex.image.width / tex.image.height;
+                    const w = h * aspect;
+                    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: biome.id === 'town' ? 1 : 0 });
+                    const geom = new THREE.PlaneGeometry(w, h);
+                    const mesh = new THREE.Mesh(geom, mat);
+                    
+                    mesh.position.set(biome.offsetX, 6, biome.z);
+                    mesh.userData = { 
+                        w: w, 
+                        h: h, 
+                        startX: biome.offsetX, 
+                        id: biome.id 
+                    };
+                    
+                    bgLayers[biome.id] = mesh;
+                    worldGroup.add(mesh);
                 });
-                bgLayers[biome.id] = group;
-                worldGroup.add(group);
             });
         }
 
@@ -544,23 +547,41 @@
             // Biome & Parallax
             if (!isInside) {
                 const px = player.position.x;
+                const camX = camera.position.x;
+                
+                // Opacity fades between biomes
                 let townOpacity = 1, leftForestOpacity = 0, rightForestOpacity = 0;
                 if (px < -BIOME_RANGE) {
-                    const factor = Math.min(1, Math.abs(px + BIOME_RANGE) / 15);
+                    const factor = Math.min(1, Math.abs(px + BIOME_RANGE) / 20);
                     townOpacity = 1 - factor; leftForestOpacity = factor;
                 } else if (px > BIOME_RANGE) {
-                    const factor = Math.min(1, (px - BIOME_RANGE) / 15);
+                    const factor = Math.min(1, (px - BIOME_RANGE) / 20);
                     townOpacity = 1 - factor; rightForestOpacity = factor;
                 }
+
+                const screenAspect = window.innerWidth / window.innerHeight;
+                const screenHalfWidth = VIEW_SIZE * screenAspect;
+
                 Object.keys(bgLayers).forEach(key => {
-                    const layer = bgLayers[key];
+                    const mesh = bgLayers[key];
                     const targetOpacity = key === 'town' ? townOpacity : (key === 'forestLeft' ? leftForestOpacity : rightForestOpacity);
-                    layer.children.forEach(mesh => {
-                        mesh.material.opacity = THREE.MathUtils.lerp(mesh.material.opacity, targetOpacity, 0.05);
-                        mesh.position.y = camera.position.y;
-                        if (!mesh.userData.startX) mesh.userData.startX = mesh.position.x;
-                        mesh.position.x = mesh.userData.startX + (camera.position.x * 0.9);
-                    });
+                    mesh.material.opacity = THREE.MathUtils.lerp(mesh.material.opacity, targetOpacity, 0.05);
+                    
+                    // Simple parallax formula: LayerPos = CameraPos * ScrollRatio
+                    // We want to scroll slower than the player (e.g., 0.9 ratio)
+                    // But we must clamp so edges of image never enter screen
+                    const scrollRatio = 0.92;
+                    let desiredX = mesh.userData.startX + (camX * scrollRatio);
+                    
+                    // Clamp logic:
+                    // Left edge of mesh: desiredX - (mesh.userData.w / 2)
+                    // Right edge of mesh: desiredX + (mesh.userData.w / 2)
+                    // We want LeftEdge <= CamX - screenHalfWidth AND RightEdge >= CamX + screenHalfWidth
+                    const minAllowedX = camX + screenHalfWidth - (mesh.userData.w / 2);
+                    const maxAllowedX = camX - screenHalfWidth + (mesh.userData.w / 2);
+                    
+                    mesh.position.x = Math.max(minAllowedX, Math.min(maxAllowedX, desiredX));
+                    mesh.position.y = camera.position.y * 0.5 + 3; // Slight vertical parallax
                 });
             }
 
