@@ -261,10 +261,8 @@
         const BIOME_RANGE = 50; 
         
         // GROUND LEVEL CONSTANTS
-        // Raising the ground from 0 to 0.75.
-        // The grass sprite has a height of 2, so centered at 1.75 means it sits exactly on y=0.75.
-        const GROUND_Y = 0.75; 
-        const GRASS_OFFSET = 1.0; // Half of grass sprite scale (2.0 / 2)
+        const GROUND_Y = 1; 
+        const GRASS_OFFSET = 0; // Changed to 0 to align with top of grass art
 
         // --- AUDIO ENGINE ---
         let audioCtx;
@@ -444,7 +442,6 @@
         function createPlayer() {
             player = new THREE.Sprite(MATERIALS.playerStand);
             player.scale.set(2.2, 2.2, 1);
-            // Spawn player at new ground height
             player.position.set(townCenter, GROUND_Y + 1.1, 2);
             
             player.userData = { 
@@ -478,8 +475,6 @@
         }
 
         function buildWorld() {
-            // Reposition grass: Since grass scale is 2, positioning it at GROUND_Y + 1.0 (GRASS_OFFSET) 
-            // makes its bottom edge sit exactly at GROUND_Y (0.75).
             for(let x = -400; x < 1000; x += 2) {
                 let frame = 3;
                 if (Math.random() < 0.15) frame = Math.floor(Math.random() * 3);
@@ -489,11 +484,8 @@
                 worldGroup.add(tile);
             }
 
-            // Raising the main floor platform to GROUND_Y (0.75).
-            // h=2 means center is at y= -0.25 to make top = 0.75.
             addPlatform(300, GROUND_Y - 1.0, 2000, 2, worldGroup);
             
-            // Adjust pub building to sit on new ground
             pubBuilding = new THREE.Sprite(MATERIALS.pub);
             pubBuilding.position.set(townCenter - 25, GROUND_Y + 2.15, 0.5); 
             pubBuilding.scale.set(5.06, 4.21, 1);
