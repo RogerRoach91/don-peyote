@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Sprite Open World - Solid Collisions</title>
+    <title>2D Sprite Open World - Tight Hitboxes</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -437,9 +437,13 @@
 
         function createPlayer() {
             player = new THREE.Sprite(MATERIALS.playerStand);
+            // Visual size remains 2.2 for sprite fidelity
             player.scale.set(2.2, 2.2, 1);
             player.position.set(townCenter, 5, 2);
-            // collision box is slightly smaller than sprite for better feel
+            
+            // HITBOX ADJUSTMENT: 
+            // We set width and height smaller than the visual sprite (2.2) 
+            // to account for transparent padding and make gameplay feel "tighter".
             player.userData = { 
                 vy: 0, 
                 onGround: false, 
@@ -448,16 +452,27 @@
                 animFrame: 0, 
                 animTimer: 0, 
                 isRespawning: false, 
-                width: 0.8, 
-                height: 2.1,
-                helper: createBoxHelper(player, 0x22d3ee) 
+                width: 0.55,  // Significantly smaller than visual width
+                height: 1.8,  // Smaller than visual height
+                helper: null 
             };
+            player.userData.helper = createBoxHelperForHitbox(player, 0x22d3ee);
             scene.add(player);
 
             interactSprite = new THREE.Sprite(MATERIALS.exclamation);
             interactSprite.scale.set(0.6, 0.6, 1);
             interactSprite.visible = false;
             scene.add(interactSprite);
+        }
+
+        // Helper specifically for the player hitbox visualization
+        function createBoxHelperForHitbox(m, c) {
+            const geom = new THREE.BoxGeometry(m.userData.width, m.userData.height, 0.2);
+            const mat = new THREE.MeshBasicMaterial({ color: c, wireframe: true });
+            const mesh = new THREE.Mesh(geom, mat);
+            scene.add(mesh);
+            mesh.visible = wireframeMode;
+            return mesh;
         }
 
         function buildWorld() {
@@ -624,7 +639,6 @@
                 // Horizontal Collision Check
                 platforms.forEach(p => {
                     if(!p.group.visible) return;
-                    // Box overlap check
                     const pLeft = p.x - p.w/2, pRight = p.x + p.w/2;
                     const pTop = p.y + p.h/2, pBottom = p.y - p.h/2;
                     const rLeft = player.position.x - player.userData.width/2;
@@ -633,7 +647,6 @@
                     const rBottom = player.position.y - player.userData.height/2;
 
                     if (rLeft < pRight && rRight > pLeft && rBottom < pTop && rTop > pBottom) {
-                        // We hit the side
                         player.position.x = oldX;
                     }
                 });
@@ -742,7 +755,7 @@
                 enemies.forEach(en => {
                     en.position.x += 0.04 * en.userData.dir;
                     if(Math.abs(en.position.x - en.userData.startX) > en.userData.range) en.userData.dir *= -1;
-                    if(player.position.distanceTo(en.position) < 1.2) {
+                    if(player.position.distanceTo(en.position) < 1.0) { // Slightly smaller damage radius
                         if(stats.potions > 0) { stats.potions--; player.position.y += 2; sfx.damage(); showMessage("Used Potion!"); } 
                         else triggerRespawn();
                     }
@@ -765,7 +778,12 @@
             });
 
             npcs.forEach(n => { if(n.sprite.userData.helper) { n.sprite.userData.helper.update(); n.sprite.userData.helper.visible = wireframeMode; }});
-            if(player.userData.helper) { player.userData.helper.update(); player.userData.helper.visible = wireframeMode; }
+            
+            // Update the custom player hitbox helper
+            if(player.userData.helper) { 
+                player.userData.helper.position.copy(player.position); 
+                player.userData.helper.visible = wireframeMode; 
+            }
 
             if(player.position.y < -12) triggerRespawn();
             renderer.render(scene, camera);
