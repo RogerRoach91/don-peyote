@@ -261,8 +261,56 @@
         const BIOME_RANGE = 50; 
         
         // GROUND LEVEL CONSTANTS
-        const GROUND_Y = 0;  // The target height of the physical ground
-        const GRASS_OFFSET = 0; // Visual grass sprite offset relative to GROUND_Y
+        const GROUND_Y = 0;  
+        const GRASS_OFFSET = 0; 
+
+        // --- IMPORTED LEVEL DATA MAPS ---
+        // This JSON structure allows importing and parsing map elements 
+        // without hardcoding loops scattered in logic functions.
+        const LEVEL_DATA = {
+            world: {
+                id: 'world',
+                grassTiles: { startX: -400, endX: 1000, step: 2, y: GROUND_Y, z: 0.4 },
+                platforms: [
+                    { x: 300, y: GROUND_Y - 0.62, w: 2000, h: 2 }, // Main floor
+                    // Some explicit town platforms
+                    { x: -15, y: GROUND_Y + 3, w: 3, h: 0.8 },
+                    { x: -25, y: GROUND_Y + 5, w: 3, h: 0.8 },
+                    { x: 15, y: GROUND_Y + 3, w: 3, h: 0.8 }
+                ],
+                buildings: [
+                    { id: 'pub', type: 'pub', x: townCenter - 25, y: GROUND_Y + 2.15, z: 0.5, w: 5.06, h: 4.21 }
+                ],
+                npcs: [
+                    { type: 'shopkeeper', x: townCenter + 5, y: GROUND_Y + 0.8, config: { type: 'shop', name: 'Merchant' } },
+                    { type: 'npc', x: townCenter - 8, y: GROUND_Y + 0.8, config: { type: 'npc', name: 'Mayor', msg: 'Welcome to SpriteVille!' } }
+                ],
+                enemies: [
+                    { x: -15, y: GROUND_Y + 4.1 },
+                    { x: -25, y: GROUND_Y + 6.1 }
+                ],
+                // Generators keep the open world populated dynamically based on parameters
+                generators: [
+                    { type: 'platform_and_enemy', count: 82, minX: -400, maxX: -40, minY: 3, maxY: 10, enemyChance: 0.4 },
+                    { type: 'platform_and_enemy', count: 218, minX: 40, maxX: 1000, minY: 3, maxY: 10, enemyChance: 0.4 }
+                ]
+            },
+            interior: {
+                id: 'interior',
+                platforms: [
+                    { x: 0, y: 0, w: 20, h: 2 },
+                    { x: -10.5, y: 5, w: 1, h: 12 },
+                    { x: 10.5, y: 5, w: 1, h: 12 },
+                    { x: 0, y: 11, w: 22, h: 1 }
+                ],
+                npcs: [
+                    { type: 'barkeeper', x: 4, y: 2, config: { type: 'npc', name: 'Joe', msg: 'The usual, Don?' } }
+                ],
+                props: [
+                    { type: 'pubOpen', x: -8, y: 3.1, z: 0.5, w: 4, h: 4 }
+                ]
+            }
+        };
 
         // --- AUDIO ENGINE ---
         let audioCtx;
@@ -394,8 +442,11 @@
             scene.add(interiorGroup);
 
             buildBiomeBackgrounds();
-            buildWorld();
-            buildInterior();
+
+            // Load levels dynamically from our data map
+            loadLevelData('world', worldGroup);
+            loadLevelData('interior', interiorGroup);
+
             createPlayer();
 
             window.addEventListener('keydown', e => { 
@@ -439,6 +490,76 @@
             });
         }
 
+        // --- NEW MAP DATA PARSER ---
+        // Reads from the LEVEL_DATA structure and populates the appropriate Three.js Group
+        function loadLevelData(levelId, group) {
+            const data = LEVEL_DATA[levelId];
+            if (!data) return;
+
+            // Generate Grass Layer (if defined)
+            if (data.grassTiles) {
+                const conf = data.grassTiles;
+                for(let x = conf.startX; x < conf.endX; x += conf.step) {
+                    let frame = 3;
+                    if (Math.random() < 0.15) frame = Math.floor(Math.random() * 3);
+                    const tile = new THREE.Sprite(MATERIALS.grassFrames[frame]);
+                    tile.position.set(x, conf.y + GRASS_OFFSET, conf.z);
+                    tile.scale.set(2, 2, 1);
+                    group.add(tile);
+                }
+            }
+
+            // Generate Platforms
+            if (data.platforms) {
+                data.platforms.forEach(p => addPlatform(p.x, p.y, p.w, p.h, group));
+            }
+
+            // Generate Buildings
+            if (data.buildings) {
+                data.buildings.forEach(b => {
+                    const mesh = new THREE.Sprite(MATERIALS[b.type]);
+                    mesh.position.set(b.x, b.y, b.z);
+                    mesh.scale.set(b.w, b.h, 1);
+                    group.add(mesh);
+                    if (b.id === 'pub') pubBuilding = mesh;
+                });
+            }
+
+            // Generate Static Props (like the exit sign)
+            if (data.props) {
+                data.props.forEach(p => {
+                    const mesh = new THREE.Sprite(MATERIALS[p.type]);
+                    mesh.position.set(p.x, p.y, p.z || 0.5);
+                    mesh.scale.set(p.w || 1, p.h || 1, 1);
+                    group.add(mesh);
+                });
+            }
+
+            // Generate Interactive NPCs
+            if (data.npcs) {
+                data.npcs.forEach(n => spawnNPC(n.x, n.y, n.type, n.config, group));
+            }
+
+            // Generate Hardcoded Enemies
+            if (data.enemies) {
+                data.enemies.forEach(e => spawnEnemy(e.x, e.y, group));
+            }
+
+            // Handle procedural generation logic embedded in the level maps
+            if (data.generators) {
+                data.generators.forEach(gen => {
+                    if (gen.type === 'platform_and_enemy') {
+                        for(let i=0; i<gen.count; i++) {
+                            const x = (Math.random() * (gen.maxX - gen.minX)) + gen.minX;
+                            const y = GROUND_Y + gen.minY + Math.random() * (gen.maxY - gen.minY);
+                            addPlatform(x, y, 3, 0.8, group);
+                            if(Math.random() < gen.enemyChance) spawnEnemy(x, y + 1.1, group);
+                        }
+                    }
+                });
+            }
+        }
+
         function createPlayer() {
             player = new THREE.Sprite(MATERIALS.playerStand);
             player.scale.set(2.2, 2.2, 1);
@@ -472,47 +593,6 @@
             scene.add(mesh);
             mesh.visible = wireframeMode;
             return mesh;
-        }
-
-        function buildWorld() {
-            for(let x = -400; x < 1000; x += 2) {
-                let frame = 3;
-                if (Math.random() < 0.15) frame = Math.floor(Math.random() * 3);
-                const tile = new THREE.Sprite(MATERIALS.grassFrames[frame]);
-                tile.position.set(x, GROUND_Y + GRASS_OFFSET, 0.4);
-                tile.scale.set(2, 2, 1);
-                worldGroup.add(tile);
-            }
-
-            addPlatform(300, -.62 , 2000, 2, worldGroup);
-            
-            pubBuilding = new THREE.Sprite(MATERIALS.pub);
-            pubBuilding.position.set(townCenter - 25, GROUND_Y + 2.15, 0.5); 
-            pubBuilding.scale.set(5.06, 4.21, 1);
-            worldGroup.add(pubBuilding);
-
-            spawnNPC(townCenter + 5, GROUND_Y + 0.8, 'shopkeeper', { type: 'shop', name: 'Merchant' }, worldGroup);
-            spawnNPC(townCenter - 8, GROUND_Y + 0.8, 'npc', { type: 'npc', name: 'Mayor', msg: 'Welcome to SpriteVille!' }, worldGroup);
-
-            for(let i=0; i<300; i++) {
-                const x = (Math.random() * 1400) - 400;
-                if(Math.abs(x - townCenter) < 40) continue; 
-                const y = GROUND_Y + 3 + Math.random() * 7;
-                addPlatform(x, y, 3, 0.8, worldGroup);
-                if(Math.random() > 0.6) spawnEnemy(x, y + 1.1);
-            }
-        }
-
-        function buildInterior() {
-            addPlatform(0, 0, 20, 2, interiorGroup); 
-            addPlatform(-10.5, 5, 1, 12, interiorGroup); 
-            addPlatform(10.5, 5, 1, 12, interiorGroup); 
-            addPlatform(0, 11, 22, 1, interiorGroup); 
-            spawnNPC(4, 2, 'barkeeper', { type: 'npc', name: 'Joe', msg: 'The usual, Don?' }, interiorGroup);
-            const exitSign = new THREE.Sprite(MATERIALS.pubOpen);
-            exitSign.scale.set(4, 4, 1);
-            exitSign.position.set(-8, 3.1, 0.5);
-            interiorGroup.add(exitSign);
         }
 
         function addPlatform(x, y, w, h, group) {
@@ -553,13 +633,13 @@
             group.add(npc);
         }
 
-        function spawnEnemy(x, y) {
+        function spawnEnemy(x, y, group) {
             const enemy = new THREE.Sprite(MATERIALS.enemy);
             enemy.position.set(x, y, 2);
             enemy.scale.set(1.2, 1.2, 1);
             enemy.userData = { startX: x, range: 4, dir: 1, helper: createBoxHelper(enemy, 0xff0000) };
             enemies.push(enemy);
-            worldGroup.add(enemy);
+            group.add(enemy);
         }
 
         function handleInteraction() {
@@ -740,25 +820,25 @@
 
             updateUI();
             
-            if (!isInside) {
-                enemies.forEach(en => {
-                    en.position.x += 0.04 * en.userData.dir;
-                    if(Math.abs(en.position.x - en.userData.startX) > en.userData.range) en.userData.dir *= -1;
-                    if(player.position.distanceTo(en.position) < 1.0) { 
-                        if(stats.potions > 0) { stats.potions--; player.position.y += 2; sfx.damage(); showMessage("Used Potion!"); } 
-                        else triggerRespawn();
-                    }
-                    if(en.userData.helper) { en.userData.helper.update(); en.userData.helper.visible = wireframeMode; }
-                });
-            }
+            enemies.forEach(en => {
+                if(!en.parent || !en.parent.visible) return; // Only process enemies in active scene
+                en.position.x += 0.04 * en.userData.dir;
+                if(Math.abs(en.position.x - en.userData.startX) > en.userData.range) en.userData.dir *= -1;
+                if(player.position.distanceTo(en.position) < 1.0) { 
+                    if(stats.potions > 0) { stats.potions--; player.position.y += 2; sfx.damage(); showMessage("Used Potion!"); } 
+                    else triggerRespawn();
+                }
+                if(en.userData.helper) { en.userData.helper.update(); en.userData.helper.visible = wireframeMode; }
+            });
 
             projectiles.forEach((p, i) => {
                 p.position.x += p.userData.vx;
                 p.userData.helper.update(); p.userData.helper.visible = wireframeMode;
                 let hit = false;
                 enemies.forEach((en, ei) => {
+                    if(!en.parent || !en.parent.visible) return; // Projectiles only hit visible enemies
                     if (p.position.distanceTo(en.position) < 1) {
-                        worldGroup.remove(en); if(en.userData.helper) worldGroup.remove(en.userData.helper);
+                        en.parent.remove(en); if(en.userData.helper) scene.remove(en.userData.helper);
                         enemies.splice(ei, 1); scene.remove(p); scene.remove(p.userData.helper);
                         projectiles.splice(i, 1); stats.gold += 5; sfx.collect(); hit = true;
                     }
