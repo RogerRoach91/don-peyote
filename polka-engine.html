@@ -471,13 +471,12 @@
         }
 
         function buildWorld() {
-            // Increased the 'bounding box' (x-step) of the grass from 2 to 2.4.
-            // This spaces them out more horizontally while maintaining asset scale.
-            for(let x = -400; x < 1000; x += 2.4) {
+            // Grass step distance set back to 2 units.
+            for(let x = -400; x < 1000; x += 2) {
                 let frame = 3;
                 if (Math.random() < 0.15) frame = Math.floor(Math.random() * 3);
                 const tile = new THREE.Sprite(MATERIALS.grassFrames[frame]);
-                tile.scale.set(2, 2, 1); // Asset size remains the same
+                tile.scale.set(2, 2, 1);
                 tile.position.set(x, 1.25, 0.4);
                 worldGroup.add(tile);
             }
