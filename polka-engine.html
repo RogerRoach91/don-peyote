@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Sprite Open World - Wandering NPCs</title>
+    <title>2D Sprite Open World - New Pub Interior</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -303,16 +303,16 @@
             "interior": {
                 "id": "interior",
                 "platforms": [
-                    { "x": 0, "y": 0, "w": 20, "h": 2 },
-                    { "x": -10.5, "y": 5, "w": 1, "h": 12 },
-                    { "x": 10.5, "y": 5, "w": 1, "h": 12 },
-                    { "x": 0, "y": 11, "w": 22, "h": 1 }
+                    { "x": 0, "y": 0, "w": 24, "h": 2 },
+                    { "x": -12.5, "y": 5, "w": 1, "h": 12 },
+                    { "x": 12.5, "y": 5, "w": 1, "h": 12 },
+                    { "x": 0, "y": 11, "w": 26, "h": 1 }
                 ],
                 "npcs": [
-                    { "type": "barkeeper", "x": 4, "y": 2, "config": { "type": "npc", "name": "Joe", "msg": "The usual, Don?", "wanderRange": 2 } }
+                    { "type": "barkeeper", "x": 6, "y": 2, "config": { "type": "npc", "name": "Joe", "msg": "The usual, Don?", "wanderRange": 2 } }
                 ],
                 "props": [
-                    { "type": "pubOpen", "x": -8, "y": 3.1, "z": 0.5, "w": 4, "h": 4 }
+                    { "type": "pubBg", "x": 0, "y": 5.5, "z": -0.5, "w": 24, "h": 11 }
                 ]
             }
         }`;
@@ -356,6 +356,7 @@
             bullet: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/items/poke-ball.png',
             pub: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/pub850x700.png',
             pubOpen: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/pub-door-open-850x700.png',
+            pubBg: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/pub-bg.png',
             barkeeper: 'https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/113.png',
             bgTown: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/village-bg.png',
             bgForestLeft: 'https://raw.githubusercontent.com/theghastlygnat/don-peyote/master/assets/forestbg-3-gemini.png',
@@ -409,6 +410,7 @@
                 bullet: createSafeMaterial(SPRITES.bullet, '#ffffff'),
                 pub: createSafeMaterial(SPRITES.pub, '#444444'),
                 pubOpen: createSafeMaterial(SPRITES.pubOpen, '#444444'),
+                pubBg: createSafeMaterial(SPRITES.pubBg, '#222222'),
                 barkeeper: createSafeMaterial(SPRITES.barkeeper, '#ffaaaa'),
                 exclamation: new THREE.SpriteMaterial({ map: createExclamationTexture(), transparent: true })
             };
@@ -448,6 +450,7 @@
                 keys[e.code] = true;
                 if(e.code === 'KeyE') handleInteraction();
                 if(e.code === 'Enter' || e.code === 'KeyJ') shoot();
+                if(e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') jump();
                 if(e.code === 'Escape') toggleOptionsFromKey();
                 tryStartMenuMusic();
             });
@@ -456,6 +459,15 @@
             
             onResize(); 
             animate();
+        }
+
+        function jump() {
+            if(!gameActive || isPaused || player.userData.isRespawning) return;
+            if(player.userData.onGround) {
+                player.userData.vy = JUMP_FORCE;
+                player.userData.onGround = false;
+                sfx.jump();
+            }
         }
 
         function handleMapUpload(event) {
@@ -585,7 +597,6 @@
         function spawnNPC(x, y, matKey, data, group) {
             const npc = new THREE.Sprite(MATERIALS[matKey]);
             npc.position.set(x, y, 1.5); npc.scale.set(1.6, 1.6, 1);
-            // Added Wander logic: state, timer, range
             npc.userData = { 
                 ...data, 
                 startX: x, 
@@ -622,7 +633,13 @@
             const fade = document.getElementById('fade-overlay'); fade.style.opacity = '1'; sfx.door();
             setTimeout(() => {
                 isInside = entering; worldGroup.visible = !entering; interiorGroup.visible = entering;
-                if (entering) player.position.set(-6, 2, 2); else player.position.set(pubBuilding ? pubBuilding.position.x - 1.2 : 0, 1.2, 2);
+                if (entering) {
+                    player.position.set(-6, 2, 2);
+                    scene.background = new THREE.Color(0x000000);
+                } else {
+                    player.position.set(pubBuilding ? pubBuilding.position.x - 1.2 : 0, 1.2, 2);
+                    scene.background = new THREE.Color(0x0a0a1a);
+                }
                 fade.style.opacity = '0'; updateUI();
             }, 500);
         }
@@ -679,32 +696,17 @@
             if (!foundInt) npcs.forEach(n => { if (n.group.visible && player.position.distanceTo(n.sprite.position) < 2.5) foundInt = true; });
             interactSprite.visible = foundInt; if (foundInt) interactSprite.position.set(player.position.x, player.position.y + 1.6 + Math.sin(Date.now() * 0.01) * 0.1, 3);
             
-            // --- NPC WANDERING UPDATE ---
             npcs.forEach(n => {
                 const s = n.sprite;
                 if (!n.group.visible) return;
-                
-                s.userData.timer -= 16; // Approx 60fps update
+                s.userData.timer -= 16;
                 if (s.userData.timer <= 0) {
-                    // Switch state
-                    if (s.userData.state === 'idle') {
-                        s.userData.state = 'moving';
-                        s.userData.dir = Math.random() > 0.5 ? 1 : -1;
-                        s.userData.timer = 1000 + Math.random() * 2000; // Walk for 1-3 seconds
-                    } else {
-                        s.userData.state = 'idle';
-                        s.userData.timer = 2000 + Math.random() * 4000; // Stay idle for 2-6 seconds
-                    }
+                    if (s.userData.state === 'idle') { s.userData.state = 'moving'; s.userData.dir = Math.random() > 0.5 ? 1 : -1; s.userData.timer = 1000 + Math.random() * 2000; } 
+                    else { s.userData.state = 'idle'; s.userData.timer = 2000 + Math.random() * 4000; }
                 }
-
                 if (s.userData.state === 'moving') {
                     const nextX = s.position.x + s.userData.moveSpeed * s.userData.dir;
-                    // Check range limits
-                    if (Math.abs(nextX - s.userData.startX) > s.userData.wanderRange) {
-                        s.userData.dir *= -1;
-                    } else {
-                        s.position.x = nextX;
-                    }
+                    if (Math.abs(nextX - s.userData.startX) > s.userData.wanderRange) s.userData.dir *= -1; else s.position.x = nextX;
                 }
                 if (s.userData.helper) s.userData.helper.update();
             });
