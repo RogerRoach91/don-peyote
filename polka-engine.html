@@ -204,22 +204,23 @@
     <div id="game-viewport">
         <div id="fade-overlay"></div>
 
+        <!-- Main Menu -->
         <div id="menu-screen" class="full-overlay">
             <div class="menu-card">
                 <button onclick="onNewGame()" class="menu-btn">New Game</button>
-                
-                <!-- Hidden file input for JSON map loading -->
-                <input type="file" id="map-upload" accept=".json" style="display: none;" onchange="handleMapUpload(event)">
-                <button onclick="document.getElementById('map-upload').click()" class="menu-btn" style="color: #facc15;">Load Custom Map (.json)</button>
-                
+                <!-- Restored Load Game button -->
+                <button onclick="showMessage('Save system coming soon!')" class="menu-btn">Load Game</button>
                 <button onclick="openOptions()" class="menu-btn">Options</button>
             </div>
         </div>
 
+        <!-- Options Menu -->
         <div id="options-overlay" class="full-overlay">
             <div class="options-panel">
                 <h2 class="text-3xl text-cyan-400 text-center mb-2">Settings</h2>
+                
                 <button onclick="toggleMusic()" id="music-btn" class="menu-btn bg-cyan-900/50 rounded-lg text-lg py-2">Music: ON</button>
+                
                 <div class="flex flex-col gap-1 px-4">
                     <label class="text-white text-sm flex justify-between">
                         <span>Music Volume</span>
@@ -227,11 +228,21 @@
                     </label>
                     <input type="range" min="0" max="100" value="40" class="volume-slider" id="music-vol" oninput="updateVolume(this.value)">
                 </div>
+
                 <button onclick="toggleSfx()" id="sfx-btn" class="menu-btn bg-cyan-900/50 rounded-lg text-lg py-2">Sounds: ON</button>
-                <div class="mt-4 pt-4 border-t border-cyan-800/50">
-                    <h3 class="text-xl text-yellow-400 text-center mb-3">Debug Menu</h3>
+
+                <div class="mt-4 pt-4 border-t border-cyan-800/50 flex flex-col gap-2">
+                    <h3 class="text-xl text-yellow-400 text-center mb-1">Advanced</h3>
+                    
+                    <!-- Custom Map Import moved here -->
+                    <input type="file" id="map-upload" accept=".json" style="display: none;" onchange="handleMapUpload(event)">
+                    <button onclick="document.getElementById('map-upload').click()" class="w-full py-2 bg-purple-900/30 border border-purple-500/50 rounded-lg text-white text-lg hover:bg-purple-800/50 transition-colors">
+                        Import Custom Map (.json)
+                    </button>
+
                     <button onclick="toggleWireframe()" id="wireframe-btn" class="w-full py-2 bg-yellow-900/30 border border-yellow-500/50 rounded-lg text-white text-lg">Wireframe Mode: OFF</button>
                 </div>
+
                 <button onclick="closeOptions()" class="mt-4 p-3 bg-red-600/80 hover:bg-red-600 text-white rounded-xl transition-colors">Close</button>
             </div>
         </div>
@@ -264,8 +275,7 @@
         const JUMP_FORCE = 0.32;
         const BIOME_RANGE = 50; 
         
-        // --- DEFAULT LEVEL JSON STRING ---
-        // Stored as a raw string so we can parse it, simulating an external .json load.
+        // --- LEVEL DATA (JSON STRING) ---
         const DEFAULT_LEVEL_JSON = `
         {
             "world": {
@@ -423,7 +433,6 @@
                 }
             });
 
-            // Isolate backgrounds so they aren't cleared when we load custom JSON maps
             backgroundGroup = new THREE.Group();
             worldGroup = new THREE.Group();
             interiorGroup = new THREE.Group();
@@ -452,7 +461,7 @@
             animate();
         }
 
-        // --- CUSTOM MAP UPLOAD HANDLER ---
+        // --- CUSTOM MAP UPLOAD ---
         function handleMapUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -463,48 +472,36 @@
                     const parsedData = JSON.parse(e.target.result);
                     currentLevelData = parsedData;
                     
-                    // Cleanup existing world elements
                     clearLevel();
-                    
-                    // Build new elements based on uploaded JSON
                     loadLevelData('world', worldGroup, currentLevelData);
                     loadLevelData('interior', interiorGroup, currentLevelData);
                     
-                    showMessage("Custom Map Loaded!");
+                    showMessage("Map Loaded!");
                     
-                    // Reset Player position if we're in-game
                     if(player) {
                         isInside = false;
                         worldGroup.visible = true;
                         interiorGroup.visible = false;
-                        player.position.set(0, 4, 2); // default drop-in
+                        player.position.set(0, 4, 2); 
                         player.userData.vy = 0;
                     }
-
                 } catch (err) {
-                    showMessage("Invalid JSON Map File!");
-                    console.error("Map parsing error:", err);
+                    showMessage("Invalid Map JSON!");
                 }
             };
             reader.readAsText(file);
-            event.target.value = ''; // Reset input
+            event.target.value = ''; 
         }
 
         function clearLevel() {
-            // Remove meshes
             while(worldGroup.children.length > 0) worldGroup.remove(worldGroup.children[0]);
             while(interiorGroup.children.length > 0) interiorGroup.remove(interiorGroup.children[0]);
-            
-            // Cleanup logical arrays
             platforms.forEach(p => { if(p.helper && p.helper.parent) p.helper.parent.remove(p.helper); });
             platforms = [];
-            
             npcs.forEach(n => { if(n.sprite.userData.helper && n.sprite.userData.helper.parent) n.sprite.userData.helper.parent.remove(n.sprite.userData.helper); });
             npcs = [];
-            
             enemies.forEach(e => { if(e.userData.helper && e.userData.helper.parent) e.userData.helper.parent.remove(e.userData.helper); });
             enemies = [];
-
             pubBuilding = null;
         }
 
@@ -524,44 +521,30 @@
                     group.add(tile);
                 }
             }
-
-            if (data.platforms) {
-                data.platforms.forEach(p => addPlatform(p.x, p.y, p.w, p.h, group));
-            }
-
+            if (data.platforms) data.platforms.forEach(p => addPlatform(p.x, p.y, p.w, p.h, group));
             if (data.buildings) {
                 data.buildings.forEach(b => {
                     const mesh = new THREE.Sprite(MATERIALS[b.type]);
-                    mesh.position.set(b.x, b.y, b.z);
-                    mesh.scale.set(b.w, b.h, 1);
+                    mesh.position.set(b.x, b.y, b.z); mesh.scale.set(b.w, b.h, 1);
                     group.add(mesh);
                     if (b.id === 'pub') pubBuilding = mesh;
                 });
             }
-
             if (data.props) {
                 data.props.forEach(p => {
                     const mesh = new THREE.Sprite(MATERIALS[p.type]);
-                    mesh.position.set(p.x, p.y, p.z || 0.5);
-                    mesh.scale.set(p.w || 1, p.h || 1, 1);
+                    mesh.position.set(p.x, p.y, p.z || 0.5); mesh.scale.set(p.w || 1, p.h || 1, 1);
                     group.add(mesh);
                 });
             }
-
-            if (data.npcs) {
-                data.npcs.forEach(n => spawnNPC(n.x, n.y, n.type, n.config, group));
-            }
-
-            if (data.enemies) {
-                data.enemies.forEach(e => spawnEnemy(e.x, e.y, group));
-            }
-
+            if (data.npcs) data.npcs.forEach(n => spawnNPC(n.x, n.y, n.type, n.config, group));
+            if (data.enemies) data.enemies.forEach(e => spawnEnemy(e.x, e.y, group));
             if (data.generators) {
                 data.generators.forEach(gen => {
                     if (gen.type === 'platform_and_enemy') {
                         for(let i=0; i<gen.count; i++) {
                             const x = (Math.random() * (gen.maxX - gen.minX)) + gen.minX;
-                            const y = gen.minY + Math.random() * (gen.maxY - gen.minY); // Using raw numbers now
+                            const y = gen.minY + Math.random() * (gen.maxY - gen.minY);
                             addPlatform(x, y, 3, 0.8, group);
                             if(Math.random() < gen.enemyChance) spawnEnemy(x, y + 1.1, group);
                         }
@@ -577,7 +560,6 @@
                 { id: 'forestLeft', url: SPRITES.bgForestLeft, z: -5.1, offsetX: -120 },
                 { id: 'forestRight', url: SPRITES.bgForestRight, z: -5.1, offsetX: 120 }
             ];
-
             biomes.forEach(biome => {
                 textureLoader.load(biome.url, (tex) => {
                     const aspect = tex.image.width / tex.image.height;
@@ -585,10 +567,8 @@
                     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: biome.id === 'town' ? 1 : 0 });
                     const geom = new THREE.PlaneGeometry(w, h);
                     const mesh = new THREE.Mesh(geom, mat);
-                    
                     const bottomY = 5 - VIEW_SIZE;
                     const centeredY = bottomY + (h * 0.7);
-
                     mesh.position.set(biome.offsetX, centeredY+5, biome.z);
                     mesh.userData = { w, h, startX: biome.offsetX, id: biome.id };
                     bgLayers[biome.id] = mesh;
@@ -599,20 +579,12 @@
 
         function createPlayer() {
             player = new THREE.Sprite(MATERIALS.playerStand);
-            player.scale.set(2.2, 2.2, 1);
-            player.position.set(0, 0, 2);
-            
-            player.userData = { 
-                vy: 0, onGround: false, facingRight: true, 
-                currentAnim: 'stand', animFrame: 0, animTimer: 0, 
-                isRespawning: false, width: 0.7, height: 1.1, helper: null 
-            };
+            player.scale.set(2.2, 2.2, 1); player.position.set(0, 0, 2);
+            player.userData = { vy: 0, onGround: false, facingRight: true, currentAnim: 'stand', animFrame: 0, animTimer: 0, isRespawning: false, width: 0.7, height: 1.1 };
             player.userData.helper = createBoxHelperForHitbox(player, 0x22d3ee);
             scene.add(player);
-
             interactSprite = new THREE.Sprite(MATERIALS.exclamation);
-            interactSprite.scale.set(0.6, 0.6, 1);
-            interactSprite.visible = false;
+            interactSprite.scale.set(0.6, 0.6, 1); interactSprite.visible = false;
             scene.add(interactSprite);
         }
 
@@ -620,8 +592,7 @@
             const geom = new THREE.BoxGeometry(m.userData.width, m.userData.height, 0.2);
             const mat = new THREE.MeshBasicMaterial({ color: c, wireframe: true });
             const mesh = new THREE.Mesh(geom, mat);
-            scene.add(mesh);
-            mesh.visible = wireframeMode;
+            scene.add(mesh); mesh.visible = wireframeMode;
             return mesh;
         }
 
@@ -635,11 +606,8 @@
                     clearInterval(checkBase);
                 }
             }, 100);
-
-            const p = new THREE.Sprite(mat);
-            p.scale.set(w, h, 1); p.position.set(x, y, 1);
+            const p = new THREE.Sprite(mat); p.scale.set(w, h, 1); p.position.set(x, y, 1);
             if (w < 100) group.add(p);
-            
             const helper = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.1), new THREE.MeshBasicMaterial({color: 0x00ff00, wireframe: true}));
             helper.position.set(x, y, 1.1); helper.visible = wireframeMode;
             group.add(helper);
@@ -650,34 +618,22 @@
             const npc = new THREE.Sprite(MATERIALS[matKey]);
             npc.position.set(x, y, 1.5); npc.scale.set(1.6, 1.6, 1);
             npc.userData = { ...data, helper: createBoxHelper(npc, 0xffffff) };
-            npcs.push({ sprite: npc, group });
-            group.add(npc);
+            npcs.push({ sprite: npc, group }); group.add(npc);
         }
 
         function spawnEnemy(x, y, group) {
             const enemy = new THREE.Sprite(MATERIALS.enemy);
             enemy.position.set(x, y, 2); enemy.scale.set(1.2, 1.2, 1);
             enemy.userData = { startX: x, range: 4, dir: 1, helper: createBoxHelper(enemy, 0xff0000) };
-            enemies.push(enemy);
-            group.add(enemy);
+            enemies.push(enemy); group.add(enemy);
         }
 
         function handleInteraction() {
             if(isPaused || player.userData.isRespawning) return;
-            
             if (!isInside && pubBuilding && pubBuilding.parent === worldGroup) {
-                const doorPosX = pubBuilding.position.x - 1.2; 
-                if (Math.abs(player.position.x - doorPosX) < 1.5) {
-                    transitionScene(true);
-                    return;
-                }
+                if (Math.abs(player.position.x - (pubBuilding.position.x - 1.2)) < 1.5) { transitionScene(true); return; }
             }
-
-            if (isInside && Math.abs(player.position.x - (-8)) < 1.5) {
-                transitionScene(false);
-                return;
-            }
-
+            if (isInside && Math.abs(player.position.x - (-8)) < 1.5) { transitionScene(false); return; }
             npcs.forEach(n => {
                 if (n.group.visible && player.position.distanceTo(n.sprite.position) < 2.5) {
                     if(n.sprite.userData.type === 'shop') document.getElementById('shop-ui').style.display = 'block';
@@ -688,16 +644,12 @@
 
         function transitionScene(entering) {
             const fade = document.getElementById('fade-overlay');
-            fade.style.opacity = '1';
-            sfx.door();
+            fade.style.opacity = '1'; sfx.door();
             setTimeout(() => {
-                isInside = entering;
-                worldGroup.visible = !entering;
-                interiorGroup.visible = entering;
+                isInside = entering; worldGroup.visible = !entering; interiorGroup.visible = entering;
                 if (entering) player.position.set(-6, 2, 2);
                 else player.position.set(pubBuilding ? pubBuilding.position.x - 1.2 : 0, 1.2, 2);
-                fade.style.opacity = '0';
-                updateUI();
+                fade.style.opacity = '0'; updateUI();
             }, 500);
         }
 
@@ -717,130 +669,78 @@
         function animate() {
             requestAnimationFrame(animate);
             if(!gameActive || isPaused || player.userData.isRespawning) { renderer.render(scene, camera); return; }
-
             const speed = 0.15 * stats.speedMult;
             let isMoving = false, moveX = 0;
-            
             if(keys['KeyA'] || keys['ArrowLeft']) { moveX -= speed; player.userData.facingRight = false; isMoving = true; }
             if(keys['KeyD'] || keys['ArrowRight']) { moveX += speed; player.userData.facingRight = true; isMoving = true; }
-            
             if (moveX !== 0) {
-                const oldX = player.position.x;
-                player.position.x += moveX;
+                const oldX = player.position.x; player.position.x += moveX;
                 platforms.forEach(p => {
                     if(!p.group.visible) return;
-                    const pLeft = p.x - p.w/2, pRight = p.x + p.w/2, pTop = p.y + p.h/2, pBottom = p.y - p.h/2;
-                    const rLeft = player.position.x - player.userData.width/2, rRight = player.position.x + player.userData.width/2, rTop = player.position.y + player.userData.height/2, rBottom = player.position.y - player.userData.height/2;
-                    if (rLeft < pRight && rRight > pLeft && rBottom < pTop && rTop > pBottom) player.position.x = oldX;
+                    if (Math.abs(player.position.x - p.x) < (p.w/2 + player.userData.width/2) && Math.abs(player.position.y - p.y) < (p.h/2 + player.userData.height/2)) player.position.x = oldX;
                 });
             }
-
             player.userData.vy += GRAVITY;
-            const oldY = player.position.y;
-            player.position.y += player.userData.vy;
+            const oldY = player.position.y; player.position.y += player.userData.vy;
             player.userData.onGround = false;
-
             platforms.forEach(p => {
                 if(!p.group.visible) return;
-                const pLeft = p.x - p.w/2, pRight = p.x + p.w/2, pTop = p.y + p.h/2, pBottom = p.y - p.h/2;
-                const rLeft = player.position.x - player.userData.width/2, rRight = player.position.x + player.userData.width/2, rTop = player.position.y + player.userData.height/2, rBottom = player.position.y - player.userData.height/2;
-
-                if (rLeft < pRight && rRight > pLeft && rBottom < pTop && rTop > pBottom) {
-                    if (player.userData.vy < 0) { player.position.y = pTop + player.userData.height/2; player.userData.vy = 0; player.userData.onGround = true; } 
-                    else if (player.userData.vy > 0) { player.position.y = pBottom - player.userData.height/2; player.userData.vy = 0; }
+                const pL = p.x - p.w/2, pR = p.x + p.w/2, pT = p.y + p.h/2, pB = p.y - p.h/2;
+                const rL = player.position.x - player.userData.width/2, rR = player.position.x + player.userData.width/2, rT = player.position.y + player.userData.height/2, rB = player.position.y - player.userData.height/2;
+                if (rL < pR && rR > pL && rB < pT && rT > pB) {
+                    if (player.userData.vy < 0) { player.position.y = pT + player.userData.height/2; player.userData.vy = 0; player.userData.onGround = true; } 
+                    else if (player.userData.vy > 0) { player.position.y = pB - player.userData.height/2; player.userData.vy = 0; }
                 }
             });
-
             if(keys['Space'] && player.userData.onGround) { player.userData.vy = JUMP_FORCE; sfx.jump(); }
-
             let targetAnim = isMoving ? (player.userData.facingRight ? 'runRight' : 'runLeft') : 'stand';
             if (player.userData.currentAnim !== targetAnim) {
                 player.userData.currentAnim = targetAnim; player.userData.animFrame = 0; player.userData.animTimer = 0;
-                player.material = MATERIALS[targetAnim === 'stand' ? 'playerStand' : (targetAnim === 'runRight' ? 'playerRunRight' : (targetAnim === 'runLeft' ? 'playerRunLeft' : 'playerStand'))];
+                player.material = MATERIALS[targetAnim === 'stand' ? 'playerStand' : (targetAnim === 'runRight' ? 'playerRunRight' : 'playerRunLeft')];
             }
-            if (targetAnim === 'stand') {
-                if (player.material.map) player.material.map.offset.x = player.userData.facingRight ? 0.5 : 0;
-            } else {
-                if (++player.userData.animTimer > 5) { player.userData.animFrame = (player.userData.animFrame + 1) % 11; player.userData.animTimer = 0; }
-                if (player.material.map) player.material.map.offset.x = player.userData.animFrame / 11;
-            }
-
+            if (targetAnim === 'stand') { if (player.material.map) player.material.map.offset.x = player.userData.facingRight ? 0.5 : 0; } 
+            else { if (++player.userData.animTimer > 5) { player.userData.animFrame = (player.userData.animFrame + 1) % 11; player.userData.animTimer = 0; } if (player.material.map) player.material.map.offset.x = player.userData.animFrame / 11; }
             if (!isInside) {
                 const px = player.position.x, camX = camera.position.x, camY = camera.position.y;
-                let townOpacity = 1, leftForestOpacity = 0, rightForestOpacity = 0;
-                if (px < -BIOME_RANGE) {
-                    const factor = Math.min(1, Math.abs(px + BIOME_RANGE) / 20);
-                    townOpacity = 1 - factor; leftForestOpacity = factor;
-                } else if (px > BIOME_RANGE) {
-                    const factor = Math.min(1, (px - BIOME_RANGE) / 20);
-                    townOpacity = 1 - factor; rightForestOpacity = factor;
-                }
-                const screenHalfWidth = VIEW_SIZE * TARGET_ASPECT;
-                Object.keys(bgLayers).forEach(key => {
-                    const mesh = bgLayers[key];
-                    const targetOpacity = key === 'town' ? townOpacity : (key === 'forestLeft' ? leftForestOpacity : rightForestOpacity);
-                    mesh.material.opacity = THREE.MathUtils.lerp(mesh.material.opacity, targetOpacity, 0.05);
-                    const scrollRatio = 0.98; let desiredX = mesh.userData.startX + (camX * scrollRatio);
-                    const minAllowedX = camX + screenHalfWidth - (mesh.userData.w / 2), maxAllowedX = camX - screenHalfWidth + (mesh.userData.w / 2);
-                    mesh.position.x = Math.max(minAllowedX, Math.min(maxAllowedX, desiredX)); mesh.position.y = (camY - VIEW_SIZE) + (mesh.userData.h / 2);
+                let tO = 1, lFO = 0, rFO = 0;
+                if (px < -BIOME_RANGE) { const f = Math.min(1, Math.abs(px + BIOME_RANGE) / 20); tO = 1 - f; lFO = f; } 
+                else if (px > BIOME_RANGE) { const f = Math.min(1, (px - BIOME_RANGE) / 20); tO = 1 - f; rFO = f; }
+                const sHW = VIEW_SIZE * TARGET_ASPECT;
+                Object.keys(bgLayers).forEach(k => {
+                    const m = bgLayers[k]; const tOp = k === 'town' ? tO : (k === 'forestLeft' ? lFO : rFO);
+                    m.material.opacity = THREE.MathUtils.lerp(m.material.opacity, tOp, 0.05);
+                    const dX = m.userData.startX + (camX * 0.98);
+                    m.position.x = Math.max(camX + sHW - m.userData.w/2, Math.min(camX - sHW + m.userData.w/2, dX)); m.position.y = (camY - VIEW_SIZE) + (m.userData.h / 2);
                 });
             }
-
             camera.position.x += (player.position.x - camera.position.x) * 0.1;
-            camera.position.y += (Math.max(isInside ? 4 : 4, player.position.y + 1) - camera.position.y) * 0.05;
-            
-            let foundInteraction = false;
-            if (!isInside && pubBuilding && pubBuilding.parent === worldGroup) {
-                const doorPosX = pubBuilding.position.x - 1.2;
-                const distToDoor = Math.abs(player.position.x - doorPosX);
-                pubBuilding.material = distToDoor < 1.5 ? MATERIALS.pubOpen : MATERIALS.pub;
-                if (distToDoor < 1.5) foundInteraction = true; 
-            } else if (isInside) {
-                if (Math.abs(player.position.x - (-8)) < 1.5) foundInteraction = true; 
-            }
-            if (!foundInteraction) npcs.forEach(n => { if (n.group.visible && player.position.distanceTo(n.sprite.position) < 2.5) foundInteraction = true; });
-            
-            interactSprite.visible = foundInteraction;
-            if (foundInteraction) interactSprite.position.set(player.position.x, player.position.y + 1.6 + Math.sin(Date.now() * 0.01) * 0.1, 3);
-
-            updateUI();
-            
+            camera.position.y += (Math.max(4, player.position.y + 1) - camera.position.y) * 0.05;
+            let foundInt = false;
+            if (!isInside && pubBuilding && pubBuilding.parent === worldGroup) { if (Math.abs(player.position.x - (pubBuilding.position.x - 1.2)) < 1.5) { pubBuilding.material = MATERIALS.pubOpen; foundInt = true; } else pubBuilding.material = MATERIALS.pub; } 
+            else if (isInside && Math.abs(player.position.x - (-8)) < 1.5) foundInt = true;
+            if (!foundInt) npcs.forEach(n => { if (n.group.visible && player.position.distanceTo(n.sprite.position) < 2.5) foundInt = true; });
+            interactSprite.visible = foundInt;
+            if (foundInt) interactSprite.position.set(player.position.x, player.position.y + 1.6 + Math.sin(Date.now() * 0.01) * 0.1, 3);
             enemies.forEach(en => {
-                if(!en.parent || !en.parent.visible) return; 
-                en.position.x += 0.04 * en.userData.dir;
+                if(!en.parent || !en.parent.visible) return; en.position.x += 0.04 * en.userData.dir;
                 if(Math.abs(en.position.x - en.userData.startX) > en.userData.range) en.userData.dir *= -1;
-                if(player.position.distanceTo(en.position) < 1.0) { 
-                    if(stats.potions > 0) { stats.potions--; player.position.y += 2; sfx.damage(); showMessage("Used Potion!"); } 
-                    else triggerRespawn();
-                }
-                if(en.userData.helper) { en.userData.helper.update(); en.userData.helper.visible = wireframeMode; }
+                if(player.position.distanceTo(en.position) < 1.0) { if(stats.potions > 0) { stats.potions--; player.position.y += 2; sfx.damage(); showMessage("Used Potion!"); } else triggerRespawn(); }
             });
-
             projectiles.forEach((p, i) => {
                 p.position.x += p.userData.vx;
-                if(p.userData.helper) { p.userData.helper.update(); p.userData.helper.visible = wireframeMode; }
-                let hit = false;
                 enemies.forEach((en, ei) => {
-                    if(!en.parent || !en.parent.visible) return; 
-                    if (p.position.distanceTo(en.position) < 1) {
-                        en.parent.remove(en); if(en.userData.helper) scene.remove(en.userData.helper);
-                        enemies.splice(ei, 1); scene.remove(p); scene.remove(p.userData.helper);
-                        projectiles.splice(i, 1); stats.gold += 5; sfx.collect(); hit = true;
-                    }
+                    if(!en.parent || !en.parent.visible) return;
+                    if (p.position.distanceTo(en.position) < 1) { en.parent.remove(en); enemies.splice(ei, 1); scene.remove(p); projectiles.splice(i, 1); stats.gold += 5; sfx.collect(); }
                 });
-                if (!hit && Math.abs(p.position.x - player.position.x) > 15) { scene.remove(p); if(p.userData.helper) scene.remove(p.userData.helper); projectiles.splice(i, 1); }
+                if (Math.abs(p.position.x - player.position.x) > 15) { scene.remove(p); projectiles.splice(i, 1); }
             });
-
-            npcs.forEach(n => { if(n.sprite.userData.helper) { n.sprite.userData.helper.update(); n.sprite.userData.helper.visible = wireframeMode; }});
-            if(player.userData.helper) { player.userData.helper.position.copy(player.position); player.userData.helper.visible = wireframeMode; }
-
-            if(player.position.y < -12) triggerRespawn();
-            renderer.render(scene, camera);
+            if(player.userData.helper) player.userData.helper.position.copy(player.position);
+            updateUI(); renderer.render(scene, camera);
         }
 
         function createBoxHelper(m, c = 0x00ff00) { const b = new THREE.BoxHelper(m, c); scene.add(b); b.visible = wireframeMode; return b; }
-        function toggleWireframe() { wireframeMode = !wireframeMode; document.getElementById('wireframe-btn').innerText = `Wireframe Mode: ${wireframeMode ? 'ON' : 'OFF'}`; platforms.forEach(p => { if(p.helper) p.helper.visible = wireframeMode; }); }
-        function shoot() { if(!gameActive || isPaused || player.userData.isRespawning) return; sfx.shoot(); const b = new THREE.Sprite(MATERIALS.bullet); b.position.copy(player.position); b.scale.set(0.6, 0.6, 1); b.userData = { vx: player.userData.facingRight ? 0.4 : -0.4, helper: createBoxHelper(b, 0xffff00) }; projectiles.push(b); scene.add(b); }
+        function toggleWireframe() { wireframeMode = !wireframeMode; document.getElementById('wireframe-btn').innerText = `Wireframe Mode: ${wireframeMode ? 'ON' : 'OFF'}`; platforms.forEach(p => { if(p.helper) p.helper.visible = wireframeMode; }); if(player.userData.helper) player.userData.helper.visible = wireframeMode; }
+        function shoot() { if(!gameActive || isPaused || player.userData.isRespawning) return; sfx.shoot(); const b = new THREE.Sprite(MATERIALS.bullet); b.position.copy(player.position); b.scale.set(0.6, 0.6, 1); b.userData = { vx: player.userData.facingRight ? 0.4 : -0.4 }; projectiles.push(b); scene.add(b); }
         function onNewGame() { initAudio(); document.getElementById('menu-screen').style.display = 'none'; const iv = document.getElementById('intro-video'); document.getElementById('intro-overlay').style.display = 'flex'; iv.play().catch(() => startGame()); iv.onended = () => { document.getElementById('intro-overlay').style.display = 'none'; startGame(); }; }
         function startGame() { gameActive = true; document.getElementById('game-ui').classList.remove('hidden'); switchMusicToGame(); }
         function openOptions() { initAudio(); document.getElementById('options-overlay').style.display = 'flex'; if (gameActive) isPaused = true; }
@@ -849,25 +749,17 @@
         function toggleMusic() { musicEnabled = !musicEnabled; document.getElementById('music-btn').innerText = musicEnabled ? "Music: ON" : "Music: OFF"; const m = gameActive ? document.getElementById('game-music') : document.getElementById('menu-music'); if (musicEnabled) m.play().catch(()=>{}); else m.pause(); }
         function toggleSfx() { sfxEnabled = !sfxEnabled; document.getElementById('sfx-btn').innerText = sfxEnabled ? "Sounds: ON" : "Sounds: OFF"; }
         function updateUI() { 
-            const px = player.position.x;
-            let zone = "SpriteVille";
-            if (px < -BIOME_RANGE) zone = "Dark Forest";
-            else if (px > BIOME_RANGE) zone = "Golden Forest";
-            if (isInside) zone = "Sprite Lounge";
+            const px = player.position.x; let zone = "SpriteVille"; if (px < -BIOME_RANGE) zone = "Dark Forest"; else if (px > BIOME_RANGE) zone = "Golden Forest"; if (isInside) zone = "Sprite Lounge";
             document.getElementById('gold-val').innerText = stats.gold; document.getElementById('pot-val').innerText = stats.potions; document.getElementById('zone-display').innerText = zone; 
         }
         function showMessage(msg) { const viewport = document.getElementById('game-viewport'); const b = document.createElement('div'); b.className = "absolute bottom-1/4 left-1/2 -translate-x-1/2 bg-yellow-400 p-2 rounded-xl z-[1000] text-black shadow-lg text-center min-w-[150px] text-sm"; b.innerText = msg; viewport.appendChild(b); setTimeout(() => b.remove(), 2500); }
         function buyItem(id, p) { if(stats.gold >= p) { stats.gold -= p; sfx.collect(); if(id === 'potion') stats.potions++; if(id === 'boots') { stats.speedMult = 1.5; showMessage("Speed Increased!"); } updateUI(); } else showMessage("Not enough gold!"); }
         function closeShop() { document.getElementById('shop-ui').style.display = 'none'; }
-
         function onResize() {
             const viewport = document.getElementById('game-viewport'); const windowW = window.innerWidth, windowH = window.innerHeight, windowAspect = windowW / windowH;
-            let finalW, finalH;
-            if (windowAspect > TARGET_ASPECT) { finalH = windowH; finalW = windowH * TARGET_ASPECT; } else { finalW = windowW; finalH = windowW / TARGET_ASPECT; }
-            viewport.style.width = finalW + 'px'; viewport.style.height = finalH + 'px';
-            renderer.setSize(finalW, finalH); camera.updateProjectionMatrix();
+            let finalW, finalH; if (windowAspect > TARGET_ASPECT) { finalH = windowH; finalW = windowH * TARGET_ASPECT; } else { finalW = windowW; finalH = windowW / TARGET_ASPECT; }
+            viewport.style.width = finalW + 'px'; viewport.style.height = finalH + 'px'; renderer.setSize(finalW, finalH); camera.updateProjectionMatrix();
         }
-
         window.onload = init;
     </script>
 </body>
