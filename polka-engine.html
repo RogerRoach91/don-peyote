@@ -452,8 +452,8 @@
                 animFrame: 0, 
                 animTimer: 0, 
                 isRespawning: false, 
-                width: 0.55,  // Significantly smaller than visual width
-                height: 1.8,  // Smaller than visual height
+                width: 0.7,   // Snug width for character core
+                height: 1.1,  // Shorter height to focus on feet/body
                 helper: null 
             };
             player.userData.helper = createBoxHelperForHitbox(player, 0x22d3ee);
@@ -689,7 +689,7 @@
                 player.userData.currentAnim = targetAnim;
                 player.userData.animFrame = 0;
                 player.userData.animTimer = 0;
-                player.material = MATERIALS[targetAnim === 'stand' ? 'playerStand' : (targetAnim === 'runRight' ? 'playerRunRight' : 'playerRunLeft')];
+                player.material = MATERIALS[targetAnim === 'stand' ? 'playerStand' : (targetAnim === 'runRight' ? 'playerRunRight' : 'runLeft')];
             }
             if (targetAnim === 'stand') {
                 if (player.material.map) player.material.map.offset.x = player.userData.facingRight ? 0.5 : 0;
