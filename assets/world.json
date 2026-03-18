@@ -1,0 +1,42 @@
+{
+            "world": {
+                "id": "world",
+                "grassTiles": { "startX": -400, "endX": 1000, "step": 2, "y": 0, "z": 0.4 },
+                "platforms": [
+                    { "x": 300, "y": -0.62, "w": 2000, "h": 2 },
+                    { "x": -15, "y": 3, "w": 3, "h": 0.8 },
+                    { "x": -25, "y": 5, "w": 3, "h": 0.8 },
+                    { "x": 15, "y": 3, "w": 3, "h": 0.8 }
+                ],
+                "buildings": [
+                    { "id": "pub", "type": "pub", "x": 0, "y": 2.15, "z": 0.5, "w": 5.06, "h": 4.21 }
+                ],
+                "npcs": [
+                    { "type": "shopkeeper", "x": 5, "y": 0.8, "config": { "type": "shop", "name": "Merchant" } },
+                    { "type": "npc", "x": -8, "y": 0.8, "config": { "type": "npc", "name": "Mayor", "msg": "Welcome to La Mancha!" } }
+                ],
+                "enemies": [
+                    { "x": -15, "y": 4.1 },
+                    { "x": -25, "y": 6.1 }
+                ],
+                "generators": [
+                    { "type": "platform_and_enemy", "count": 30, "minX": -400, "maxX": 1000, "minY": 3, "maxY": 6, "enemyChance": 0.4 },
+                    { "type": "platform_and_enemy", "count": 218, "minX": -400, "maxX": 1000, "minY": 3, "maxY": 6, "enemyChance": 0.4 }
+                ]
+            },
+            "interior": {
+                "id": "interior",
+                "platforms": [
+                    { "x": 0, "y": 0, "w": 20, "h": 2 },
+                    { "x": -10.5, "y": 5, "w": 1, "h": 12 },
+                    { "x": 10.5, "y": 5, "w": 1, "h": 12 },
+                    { "x": 0, "y": 11, "w": 22, "h": 1 }
+                ],
+                "npcs": [
+                    { "type": "barkeeper", "x": 4, "y": 2, "config": { "type": "npc", "name": "Joe", "msg": "The usual, Don?" } }
+                ],
+                "props": [
+                    { "type": "pubOpen", "x": -8, "y": 3.1, "z": 0.5, "w": 4, "h": 4 }
+                ]
+            }
+}
