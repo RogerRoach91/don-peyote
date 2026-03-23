@@ -285,7 +285,7 @@
                     { "x": 15, "y": 3, "w": 3, "h": 0.8 }
                 ],
                 "buildings": [
-                    { "id": "pub", "type": "pub", "x": -25, "y": 1.85, "z": 0.5, "w": 3.5, "h": 2.9 }
+                    { "id": "pub", "type": "pub", "x": -25, "y": 2.15, "z": 0.5, "w": 5.06, "h": 4.21 }
                 ],
                 "npcs": [
                     { "type": "shopkeeper", "x": 5, "y": 0.8, "config": { "type": "shop", "name": "Merchant", "wanderRange": 3 } },
@@ -720,6 +720,10 @@
                 if (s.userData.timer <= 0) {
                     if (s.userData.state === 'idle') { s.userData.state = 'moving'; s.userData.dir = Math.random() > 0.5 ? 1 : -1; s.userData.timer = 1000 + Math.random() * 2000; } 
                     else { s.userData.state = 'idle'; s.userData.timer = 2000 + Math.random() * 4000; }
+                }
+                if (s.userData.state === 'moving') {
+                    const nextX = s.position.x + s.userData.moveSpeed * s.userData.dir;
+                    if (Math.abs(nextX - s.userData.startX) > s.userData.wanderRange) s.userData.dir *= -1; else s.position.x = nextX;
                 }
                 if (s.userData.state === 'moving') {
                     const nextX = s.position.x + s.userData.moveSpeed * s.userData.dir;
