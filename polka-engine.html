@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Sprite Open World - Fixed Animation</title>
+    <title>2D Sprite Open World - Scaled Pub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -285,7 +285,7 @@
                     { "x": 15, "y": 3, "w": 3, "h": 0.8 }
                 ],
                 "buildings": [
-                    { "id": "pub", "type": "pub", "x": -25, "y": 3.88, "z": 0.5, "w": 8.5, "h": 7.0 }
+                    { "id": "pub", "type": "pub", "x": -25, "y": 1.85, "z": 0.5, "w": 3.5, "h": 2.9 }
                 ],
                 "npcs": [
                     { "type": "shopkeeper", "x": 5, "y": 0.8, "config": { "type": "shop", "name": "Merchant", "wanderRange": 3 } },
@@ -624,7 +624,7 @@
         function handleInteraction() {
             if(isPaused || player.userData.isRespawning) return;
             if (!inPubLevel && pubBuilding && pubBuilding.parent === worldGroup) { 
-                if (Math.abs(player.position.x - (pubBuilding.position.x - 2.0)) < 1.5) { transitionScene(true); return; } 
+                if (Math.abs(player.position.x - (pubBuilding.position.x - 0.8)) < 1.2) { transitionScene(true); return; } 
             }
             if (inPubLevel && Math.abs(player.position.x - (-6)) < 1.5) { transitionScene(false); return; }
             npcs.forEach(n => {
@@ -643,7 +643,7 @@
                     player.position.set(-5, 2, 2);
                     scene.background = new THREE.Color(0x000000);
                 } else {
-                    player.position.set(pubBuilding ? pubBuilding.position.x - 2.0 : 0, 1.2, 2);
+                    player.position.set(pubBuilding ? pubBuilding.position.x - 0.8 : 0, 1.2, 2);
                     scene.background = new THREE.Color(0x0a0a1a);
                 }
                 fade.style.opacity = '0'; updateUI();
@@ -686,12 +686,8 @@
                     else if (player.userData.vy > 0) { player.position.y = pB - player.userData.height/2; player.userData.vy = 0; }
                 }
             });
-            
             let targetAnim = isMoving ? (player.userData.facingRight ? 'runRight' : 'runLeft') : 'stand';
-            
-            // FIXED LINE: Ensuring playerRunLeft is used correctly
             if (player.userData.currentAnim !== targetAnim) { player.userData.currentAnim = targetAnim; player.userData.animFrame = 0; player.userData.animTimer = 0; player.material = MATERIALS[targetAnim === 'stand' ? 'playerStand' : (targetAnim === 'runRight' ? 'playerRunRight' : 'playerRunLeft')]; }
-            
             if (targetAnim === 'stand') { if (player.material.map) player.material.map.offset.x = player.userData.facingRight ? 0.5 : 0; } 
             else { if (++player.userData.animTimer > 5) { player.userData.animFrame = (player.userData.animFrame + 1) % 11; player.userData.animTimer = 0; } if (player.material.map) player.material.map.offset.x = player.userData.animFrame / 11; }
             if (!inPubLevel) {
@@ -704,7 +700,7 @@
             
             let foundInt = false;
             if (!inPubLevel && pubBuilding && pubBuilding.parent === worldGroup) { 
-                if (Math.abs(player.position.x - (pubBuilding.position.x - 2.0)) < 1.5) { 
+                if (Math.abs(player.position.x - (pubBuilding.position.x - 0.8)) < 1.2) { 
                     pubBuilding.material = MATERIALS.pubOpen; 
                     foundInt = true; 
                 } else {
@@ -748,7 +744,6 @@
         function toggleOptionsFromKey() { if (!gameActive) return; isPaused ? closeOptions() : openOptions(); }
         function toggleMusic() { musicEnabled = !musicEnabled; document.getElementById('music-btn').innerText = musicEnabled ? "Music: ON" : "Music: OFF"; const m = gameActive ? document.getElementById('game-music') : document.getElementById('menu-music'); if (musicEnabled) m.play().catch(()=>{}); else m.pause(); }
         function toggleSfx() { sfxEnabled = !sfxEnabled; document.getElementById('sfx-btn').innerText = sfxEnabled ? "Sounds: ON" : "Sounds: OFF"; }
-        function updateVolume(v) { globalMusicVol = v/100; document.getElementById('vol-label').innerText = v + "%"; const m = document.getElementById('menu-music'), g = document.getElementById('game-music'); if(m) m.volume = globalMusicVol; if(g) g.volume = globalMusicVol; }
         function updateUI() { const px = player.position.x; let zone = "SpriteVille"; if (px < -BIOME_RANGE) zone = "Dark Forest"; else if (px > BIOME_RANGE) zone = "Golden Forest"; if (inPubLevel) zone = "Sprite Lounge"; document.getElementById('gold-val').innerText = stats.gold; document.getElementById('pot-val').innerText = stats.potions; document.getElementById('zone-display').innerText = zone; }
         function showMessage(msg) { const viewport = document.getElementById('game-viewport'); const b = document.createElement('div'); b.className = "absolute bottom-1/4 left-1/2 -translate-x-1/2 bg-yellow-400 p-2 rounded-xl z-[1000] text-black shadow-lg text-center min-w-[150px] text-sm"; b.innerText = msg; viewport.appendChild(b); setTimeout(() => b.remove(), 2500); }
         function buyItem(id, p) { if(stats.gold >= p) { stats.gold -= p; sfx.collect(); if(id === 'potion') stats.potions++; if(id === 'boots') { stats.speedMult = 1.5; showMessage("Speed Increased!"); } updateUI(); } else showMessage("Not enough gold!"); }
