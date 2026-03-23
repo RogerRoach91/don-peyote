@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Sprite Open World - Scaled Pub</title>
+    <title>2D Sprite Open World - Logic Cleanup</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -720,10 +720,6 @@
                 if (s.userData.timer <= 0) {
                     if (s.userData.state === 'idle') { s.userData.state = 'moving'; s.userData.dir = Math.random() > 0.5 ? 1 : -1; s.userData.timer = 1000 + Math.random() * 2000; } 
                     else { s.userData.state = 'idle'; s.userData.timer = 2000 + Math.random() * 4000; }
-                }
-                if (s.userData.state === 'moving') {
-                    const nextX = s.position.x + s.userData.moveSpeed * s.userData.dir;
-                    if (Math.abs(nextX - s.userData.startX) > s.userData.wanderRange) s.userData.dir *= -1; else s.position.x = nextX;
                 }
                 if (s.userData.state === 'moving') {
                     const nextX = s.position.x + s.userData.moveSpeed * s.userData.dir;
