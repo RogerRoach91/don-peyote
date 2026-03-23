@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Sprite Open World - Scaled Pub</title>
+    <title>2D Sprite Open World - Fixed Animation</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -623,7 +623,6 @@
 
         function handleInteraction() {
             if(isPaused || player.userData.isRespawning) return;
-            // Updated door offset to -2.0 for the larger pub
             if (!inPubLevel && pubBuilding && pubBuilding.parent === worldGroup) { 
                 if (Math.abs(player.position.x - (pubBuilding.position.x - 2.0)) < 1.5) { transitionScene(true); return; } 
             }
@@ -644,7 +643,6 @@
                     player.position.set(-5, 2, 2);
                     scene.background = new THREE.Color(0x000000);
                 } else {
-                    // Spawn player slightly in front of the door (offset -2.0)
                     player.position.set(pubBuilding ? pubBuilding.position.x - 2.0 : 0, 1.2, 2);
                     scene.background = new THREE.Color(0x0a0a1a);
                 }
@@ -688,8 +686,12 @@
                     else if (player.userData.vy > 0) { player.position.y = pB - player.userData.height/2; player.userData.vy = 0; }
                 }
             });
+            
             let targetAnim = isMoving ? (player.userData.facingRight ? 'runRight' : 'runLeft') : 'stand';
-            if (player.userData.currentAnim !== targetAnim) { player.userData.currentAnim = targetAnim; player.userData.animFrame = 0; player.userData.animTimer = 0; player.material = MATERIALS[targetAnim === 'stand' ? 'playerStand' : (targetAnim === 'runRight' ? 'playerRunRight' : 'runLeft')]; }
+            
+            // FIXED LINE: Ensuring playerRunLeft is used correctly
+            if (player.userData.currentAnim !== targetAnim) { player.userData.currentAnim = targetAnim; player.userData.animFrame = 0; player.userData.animTimer = 0; player.material = MATERIALS[targetAnim === 'stand' ? 'playerStand' : (targetAnim === 'runRight' ? 'playerRunRight' : 'playerRunLeft')]; }
+            
             if (targetAnim === 'stand') { if (player.material.map) player.material.map.offset.x = player.userData.facingRight ? 0.5 : 0; } 
             else { if (++player.userData.animTimer > 5) { player.userData.animFrame = (player.userData.animFrame + 1) % 11; player.userData.animTimer = 0; } if (player.material.map) player.material.map.offset.x = player.userData.animFrame / 11; }
             if (!inPubLevel) {
@@ -701,7 +703,6 @@
             camera.position.x += (player.position.x - camera.position.x) * 0.1; camera.position.y += (Math.max(4, player.position.y + 1) - camera.position.y) * 0.05;
             
             let foundInt = false;
-            // Updated hover detect area for the scaled pub door
             if (!inPubLevel && pubBuilding && pubBuilding.parent === worldGroup) { 
                 if (Math.abs(player.position.x - (pubBuilding.position.x - 2.0)) < 1.5) { 
                     pubBuilding.material = MATERIALS.pubOpen; 
